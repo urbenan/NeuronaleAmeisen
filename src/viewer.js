@@ -4,7 +4,8 @@
 // Zwei Finger: zoomen (und verschieben), ein Finger ziehen: verschieben, Doppeltippen: Gesamtansicht.
 // Wer an der Duftquelle ankommt oder aus dem Bild rutscht, startet unten neu.
 
-// Beim Bündeln (build_web.py) wird hier eine trainierte Kolonie eingesetzt
+// Beim Bündeln (build_web.py) werden hier die Lernstufen aus trained/viewer/ eingesetzt
+// (Liste, von früh nach spät): [{ label, data }]
 const EMBEDDED_ANTS = /*__TRAINED__*/null;
 const BUILD = "__BUILD__";     // build_web.py setzt hier die Version ein (zum Prüfen, ob die neue Version läuft)
 
@@ -37,9 +38,10 @@ function describe(o) {
 function readStore(key) {
   try { const s = localStorage.getItem(key); return s ? JSON.parse(s) : null; } catch (e) { return null; }
 }
+// Auswahl: ungelernt, eingebaute Lernstufen, Lernstand der Hauptseite, geladene Datei
 function sources() {
-  const list = [];
-  if (EMBEDDED_ANTS) list.push({ key: "embedded", label: "Eingebaute Kolonie", data: EMBEDDED_ANTS });
+  const list = [{ key: "random", label: "Ungelernt (Zufallsnetze)", random: true }];
+  for (const e of EMBEDDED_ANTS || []) list.push({ key: "stufe:" + e.label, label: e.label, data: e.data });
   const main = readStore(MAIN_STORE);
   if (main) list.push({ key: "main", label: "Aus der Hauptseite", data: main });
   const file = readStore(VIEWER_STORE);
@@ -48,17 +50,23 @@ function sources() {
 }
 function fillSourceMenu(selectKey) {
   const list = sources(), sel = $("source");
-  sel.innerHTML = list.map((s) => `<option value="${s.key}">${s.label}</option>`).join("") || `<option value="">Zufallsnetze</option>`;
-  if (selectKey && list.some((s) => s.key === selectKey)) sel.value = selectKey;
+  sel.innerHTML = list.map((s) => `<option value="${s.key}">${s.label}</option>`).join("");
+  // Standard: die letzte (beste) eingebaute Stufe
+  const embedded = list.filter((s) => s.key.startsWith("stufe:"));
+  sel.value = selectKey && list.some((s) => s.key === selectKey) ? selectKey : embedded.length ? embedded[embedded.length - 1].key : list[0].key;
   return list;
 }
 function useSource(key) {
   const list = sources(), s = list.find((x) => x.key === key) || list[0];
-  let nets;
-  if (s) {
+  let nets = null;
+  if (s && !s.random) {
     try { nets = netsFrom(s.data); sourceName = `${s.label}: ${describe(s.data)}`; } catch (e) { nets = null; }
   }
-  if (!nets) { nets = Array.from({ length: 12 }, (_, i) => createBrain(i + 1)); sourceName = "Zufallsnetze (noch nichts gelernt)"; }
+  if (!nets) {
+    const seed0 = Math.floor(rng() * 1e6);
+    nets = Array.from({ length: 16 }, (_, i) => createBrain(seed0 + i));
+    sourceName = "Ungelernt: 16 Zufallsnetze – so fängt jede Kolonie an";
+  }
   // eine einzelne Ameise: mehrere Kopien laufen lassen
   while (nets.length < 16) nets = nets.concat(nets.map(netClone)).slice(0, 16);   // wenige Individuen: doppelt
   ants = nets.slice(0, 32).map((net) => spawn({ ctrl: createController(net, BRAIN_DEFAULTS, world) }, true));
@@ -185,6 +193,7 @@ $("help").onclick = () => message(
   `• <b>iPhone neigen</b> = Hang neigen: Oberkante hoch → bergauf zur Duftquelle. Seitlich kippen → seitlicher Hang.<br>` +
   `• <b>Nullpunkt</b>: so wie du das iPhone gerade hältst, gilt als flach.<br>` +
   `• <b>Antippen</b>: Duftquelle dorthin setzen.<br>` +
+  `• <b>Auswahl unten</b>: Lernstufen von ungelernt bis nachgeahmt vergleichen.<br>` +
   `• <b>Zwei Finger</b>: zoomen · <b>ziehen</b>: verschieben · <b>doppelt tippen</b>: ganze Fläche.<br>` +
   `• Getestet bis 25° – noch steiler rutschen sie irgendwann ab.<br><br>${sourceName}<br><span style="color:var(--muted)">Version ${BUILD}</span>`);
 // Gesten: Antippen = Duftquelle setzen, ziehen = verschieben, zwei Finger = zoomen, doppelt = Gesamtansicht.
@@ -342,5 +351,5 @@ fillSourceMenu(startKey);
 useSource($("source").value);
 showSensorState();
 showBar();
-if (!sources().length) message("Noch keine trainierten Ameisen gefunden – es laufen Zufallsnetze.<br>Trainieren in der Hauptseite, oder «Datei…» mit einem gespeicherten Lernstand (.json).");
+if (!EMBEDDED_ANTS) message("Noch keine trainierten Ameisen eingebaut – es laufen Zufallsnetze.<br>Trainieren in der Hauptseite, oder «Datei…» mit einem gespeicherten Lernstand (.json).");
 requestAnimationFrame(frame);

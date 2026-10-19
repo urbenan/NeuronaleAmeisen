@@ -1,6 +1,9 @@
 // Viewer-Kolonie zusammenstellen: aus gespeicherten Kolonien die einzeln besten Ameisen auswählen.
 //   node tools/pick_viewer.js <Anzahl> <Ausgabe.json> <kolonie1.json> [kolonie2.json ...]
 // Bewertung je Ameise: 3 Startrichtungen bei 0°, 10° und 20° (Summe der Fitness).
+// Ohne Steigungssinn trainierte Kolonien: Gewichte der Hang-Eingänge werden 0 gesetzt (im Training
+// waren diese Eingänge immer 0, die Gewichte nur zufällig mutiert) – so laufen sie im Viewer wie trainiert.
+// Umgebungsvariablen: VIEWER_INFO (Beschreibung), VIEWER_LABEL (Name in der Auswahl).
 const fs = require("fs");
 const { S } = require("../test/load");
 const [count, out, ...files] = process.argv.slice(2);
@@ -9,6 +12,10 @@ const res = JSON.parse(S(`(() => {
   const all = [];
   for (const c of cfg.cols) c.data.members.forEach((m, i) => {
     const net = brainFromJSON(m.net);
+    if (c.data.episode && c.data.episode.brain && c.data.episode.brain.slopeSense === false) {
+      for (let r = 28; r < net.nIn; r++) for (let j = 0; j < net.nHid; j++) net.W1[r * net.nHid + j] = 0;
+      m.net = netToJSON(net);
+    }
     let score = 0, ok = 0;
     const per = {};
     for (const slope of [0, 10, 20]) {
@@ -24,7 +31,9 @@ const base = cfg.cols[0].data;
 const outJson = {
   ...base, members: res.map((r) => ({ id: r.id, parents: null, net: r.net, from: r.from })),
   viewer: { picked: res.map((r) => ({ from: r.from, id: r.id, score: +r.score.toFixed(1), oben: r.per })) },
+  history: [],                                   // Lernkurve braucht der Viewer nicht
   viewerInfo: process.env.VIEWER_INFO || null,
+  viewerLabel: process.env.VIEWER_LABEL || null,
 };
 fs.writeFileSync(out, JSON.stringify(outJson));
 for (const r of res) console.log(`${r.from.replace(/.*\//, "")} #${r.id}: Fitness ${r.score.toFixed(1)}, oben bei 0°/10°/20°: ${r.per[0]}/${r.per[10]}/${r.per[20]} von 3`);

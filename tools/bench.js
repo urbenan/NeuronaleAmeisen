@@ -5,7 +5,7 @@
 // und die ganze Kolonie. Der Steigungssinn wird so verwendet, wie die Kolonie trainiert wurde.
 const fs = require("fs");
 const { S } = require("../test/load");
-const SLOPES = [0, 5, 10, 15, 20, 25];
+const SLOPES = process.env.BENCH_SLOPES ? process.env.BENCH_SLOPES.split(",").map(Number) : [0, 5, 10, 15, 20, 25];
 for (const file of process.argv.slice(2)) {
   globalThis.cfg = { data: JSON.parse(fs.readFileSync(file, "utf8")), slopes: SLOPES };
   const r = JSON.parse(S(`(() => {

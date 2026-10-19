@@ -5,8 +5,8 @@ Aufruf:
 
 Ergebnis im Ordner web/:
     index.html            eigenständige Seite (alle Skripte aus src/ eingebettet, keine externen Dateien)
-    viewer.html           Vollbild-Viewer fürs iPhone (Neigung per Lagesensor), mit eingebauter
-                          trainierter Kolonie aus trained/kolonie.json (falls vorhanden)
+    viewer.html           Vollbild-Viewer fürs iPhone (Neigung per Lagesensor), mit den Lernstufen
+                          aus trained/viewer/*.json (Auswahl im Viewer)
     manifest.webmanifest, manifest-viewer.webmanifest  App-Manifeste ("Zum Home-Bildschirm")
     sw.js                 Service Worker: Seite offline aus dem Cache laden (nur über https/localhost)
     icon-180.png, icon-512.png
@@ -35,7 +35,7 @@ def head_extra(title, manifest, status="default"):
 <link rel="apple-touch-icon" href="icon-180.png">
 """
 
-TRAINED = os.path.join(HERE, "trained", "kolonie.json")
+STAGES = os.path.join(HERE, "trained", "viewer")   # Lernstufen für den Viewer, Dateinamen geben die Reihenfolge
 
 SW_REGISTER = """<script>
 // Offline: Service Worker nur über https oder localhost (bei file:// geht es auch ohne)
@@ -131,10 +131,15 @@ def manifest(name, short, start):
 def main():
     os.makedirs(WEB, exist_ok=True)
     page, n = build_page("index.html", "index.html", head_extra("Ameisen", "manifest.webmanifest"))
-    trained = None
-    if os.path.exists(TRAINED):
-        with open(TRAINED, encoding="utf-8") as f:
-            trained = json.dumps(json.load(f), separators=(",", ":"))
+    trained, stages = None, []
+    if os.path.isdir(STAGES):
+        for name in sorted(os.listdir(STAGES)):
+            if name.endswith(".json"):
+                with open(os.path.join(STAGES, name), encoding="utf-8") as f:
+                    o = json.load(f)
+                stages.append({"label": o.get("viewerLabel") or name[:-5], "data": o})
+    if stages:
+        trained = json.dumps(stages, ensure_ascii=False, separators=(",", ":"))
     viewer, nv = build_page("viewer.html", "viewer.html",
                             head_extra("Ameisen-Viewer", "manifest-viewer.webmanifest", "black-translucent"),
                             embed=trained or "null")
@@ -182,7 +187,7 @@ self.addEventListener("fetch", (e) => {{
         f.write(sw)
     print(f"web/index.html erzeugt ({n} Skripte eingebettet, {len(page) // 1024} KB)")
     print(f"web/viewer.html erzeugt ({nv} Skripte, {len(viewer) // 1024} KB, "
-          f"{'mit trainierter Kolonie' if trained else 'OHNE trainierte Kolonie (trained/kolonie.json fehlt)'})")
+          f"{len(stages)} Lernstufen: {', '.join(st['label'] for st in stages) or 'KEINE (trained/viewer/ leer)'})")
     print(f"Cache-Version {version}")
 
 
