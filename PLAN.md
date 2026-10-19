@@ -49,3 +49,8 @@ hinauf zu laufen und einem Duftgradienten zu folgen. Läuft im Browser (2D von o
   keine Verbesserung. Beste nachgeahmte Individuen schaffen bereits 30° (3/3 Starts), eines 32°;
   die besten nach der Evolution nur 30°, ab 35° keine. Startkolonie war allerdings noch mit σ 0.02
   mutiert (22 von 24 Starts beschädigt) – ein sauberer Neuversuch steht aus.
+- Sauberer Neuversuch: Startkolonie = 8 nachgeahmte Individuen + je 2 Kopien (σ 0.003), keine Kreuzung
+  (unabhängig gelernte Netze haben verschiedene Neuronen-Bedeutungen), σ 0.004, Curriculum 24°→36°,
+  Neigungsmix, 3 Läufe à 30 000 Episoden. Ergebnis bester Lauf (alle 24 Ameisen): 0°–25° 100 %,
+  30° 93 % (vorher 63 %), 32° 69 % (vorher 21 %). 34° schafft keine Ameise – harte Grenze bei μ 0.8.
+  Viewer-Stufe 5 «Evolution nach Nachahmen»: 12 beste, 100 % bis 32°.

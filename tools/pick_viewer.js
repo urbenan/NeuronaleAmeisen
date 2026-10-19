@@ -1,13 +1,14 @@
 // Viewer-Kolonie zusammenstellen: aus gespeicherten Kolonien die einzeln besten Ameisen auswählen.
 //   node tools/pick_viewer.js <Anzahl> <Ausgabe.json> <kolonie1.json> [kolonie2.json ...]
-// Bewertung je Ameise: 3 Startrichtungen bei 0°, 10° und 20° (Summe der Fitness).
+// Bewertung je Ameise: 3 Startrichtungen bei 0°, 10° und 20° (Summe der Fitness);
+// andere Neigungen für die Rangfolge per PICK_SLOPES, z. B. PICK_SLOPES=20,30,32.
 // Ohne Steigungssinn trainierte Kolonien: Gewichte der Hang-Eingänge werden 0 gesetzt (im Training
 // waren diese Eingänge immer 0, die Gewichte nur zufällig mutiert) – so laufen sie im Viewer wie trainiert.
 // Umgebungsvariablen: VIEWER_INFO (Beschreibung), VIEWER_LABEL (Name in der Auswahl).
 const fs = require("fs");
 const { S } = require("../test/load");
 const [count, out, ...files] = process.argv.slice(2);
-globalThis.cfg = { count: +count, cols: files.map((f) => ({ name: f, data: JSON.parse(fs.readFileSync(f, "utf8")) })) };
+globalThis.cfg = { slopes: (process.env.PICK_SLOPES || "0,10,20").split(",").map(Number), count: +count, cols: files.map((f) => ({ name: f, data: JSON.parse(fs.readFileSync(f, "utf8")) })) };
 const res = JSON.parse(S(`(() => {
   const all = [];
   for (const c of cfg.cols) c.data.members.forEach((m, i) => {
@@ -18,7 +19,7 @@ const res = JSON.parse(S(`(() => {
     }
     let score = 0, ok = 0;
     const per = {};
-    for (const slope of [0, 10, 20]) {
+    for (const slope of cfg.slopes) {
       const r = evaluate(net, { seconds: 15, world: { slopeDeg: slope }, starts: [90, 50, 130] });
       score += r.fitness; ok += r.reachedCount; per[slope] = r.reachedCount;
     }
@@ -36,5 +37,5 @@ const outJson = {
   viewerLabel: process.env.VIEWER_LABEL || null,
 };
 fs.writeFileSync(out, JSON.stringify(outJson));
-for (const r of res) console.log(`${r.from.replace(/.*\//, "")} #${r.id}: Fitness ${r.score.toFixed(1)}, oben bei 0°/10°/20°: ${r.per[0]}/${r.per[10]}/${r.per[20]} von 3`);
+for (const r of res) console.log(`${r.from.replace(/.*\//, "")} #${r.id}: Fitness ${r.score.toFixed(1)}, oben bei ${cfg.slopes.map((s) => s + "°").join("/")}: ${cfg.slopes.map((s) => r.per[s]).join("/")} von 3`);
 console.log(`gespeichert: ${out} (${Math.round(fs.statSync(out).size / 1024)} KB)`);
