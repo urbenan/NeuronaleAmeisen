@@ -998,6 +998,9 @@ function draw() {
   const sx = (x) => (x - field.x0) * sc, sy = (y) => (field.y1 - y) * sc;
   ctx.fillStyle = cssVar("--bg"); ctx.fillRect(0, 0, w, h);
   drawScent(ctx, world.scent, sx, sy, sc, false, false);   // nur Farbverlauf, keine Kreise
+  // Zentrum der Duftquelle: kleiner zarter Kreis
+  ctx.strokeStyle = `rgba(${cssVar("--scent-rgb")}, 0.55)`; ctx.lineWidth = 1.5;
+  ctx.beginPath(); ctx.arc(sx(world.scent.x), sy(world.scent.y), 7, 0, 2 * Math.PI); ctx.stroke();
   const v = { showForces: false, sense: false, feet: false };
   for (const m of ants) drawAnt(ctx, m.ant, sx, sy, sc, v);
   drawSlopeArrow(ctx, w, h);
