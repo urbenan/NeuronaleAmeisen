@@ -85,8 +85,9 @@ function drawWorld(cv, world, ant, view) {
   drawAnt(ctx, ant, sx, sy, sc, view);
 }
 
-// Duftwolke um die Quelle; Ringe bei C = 0.8, 0.6, 0.4, 0.2, 0.1 (labels = false: ohne Beschriftung)
-function drawScent(ctx, scent, sx, sy, sc, labels = true) {
+// Duftwolke um die Quelle; Ringe bei C = 0.8, 0.6, 0.4, 0.2, 0.1
+// labels = false: ohne Beschriftung, rings = false: nur der weiche Farbverlauf
+function drawScent(ctx, scent, sx, sy, sc, labels = true, rings = true) {
   const cx = sx(scent.x), cy = sy(scent.y), col = cssVar("--scent-rgb");
   const R = 3 * scent.lambda * sc;
   const g = ctx.createRadialGradient(cx, cy, 0, cx, cy, R);
@@ -94,61 +95,82 @@ function drawScent(ctx, scent, sx, sy, sc, labels = true) {
   g.addColorStop(1, `rgba(${col}, 0)`);
   ctx.fillStyle = g;
   ctx.beginPath(); ctx.arc(cx, cy, R, 0, 2 * Math.PI); ctx.fill();
-  ctx.strokeStyle = `rgba(${col}, 0.45)`; ctx.lineWidth = 1; ctx.setLineDash([3, 4]);
-  ctx.font = "11px " + cssVar("--font-num"); ctx.fillStyle = `rgba(${col}, 0.9)`; ctx.textBaseline = "bottom";
-  for (const c of [0.8, 0.6, 0.4, 0.2, 0.1]) {
-    const r = -Math.log(c) * scent.lambda * sc;
-    ctx.beginPath(); ctx.arc(cx, cy, r, 0, 2 * Math.PI); ctx.stroke();
-    if (labels) ctx.fillText(c.toFixed(1), cx + r * 0.7071 + 3, cy + r * 0.7071 - 1);
+  if (rings) {
+    ctx.strokeStyle = `rgba(${col}, 0.45)`; ctx.lineWidth = 1; ctx.setLineDash([3, 4]);
+    ctx.font = "11px " + cssVar("--font-num"); ctx.fillStyle = `rgba(${col}, 0.9)`; ctx.textBaseline = "bottom";
+    for (const c of [0.8, 0.6, 0.4, 0.2, 0.1]) {
+      const r = -Math.log(c) * scent.lambda * sc;
+      ctx.beginPath(); ctx.arc(cx, cy, r, 0, 2 * Math.PI); ctx.stroke();
+      if (labels) ctx.fillText(c.toFixed(1), cx + r * 0.7071 + 3, cy + r * 0.7071 - 1);
+    }
+    ctx.setLineDash([]);
+    ctx.fillStyle = `rgb(${col})`;
+    ctx.beginPath(); ctx.arc(cx, cy, 6, 0, 2 * Math.PI); ctx.fill();
   }
-  ctx.setLineDash([]);
-  ctx.fillStyle = `rgb(${col})`;
-  ctx.beginPath(); ctx.arc(cx, cy, 6, 0, 2 * Math.PI); ctx.fill();
-  if (labels) { ctx.font = "600 12px " + cssVar("--font-ui"); ctx.fillText("Duftquelle", cx + 9, cy - 4); }
+  if (labels) { ctx.font = "600 12px " + cssVar("--font-ui"); ctx.fillStyle = `rgb(${col})`; ctx.fillText("Duftquelle", cx + 9, cy - 4); }
 }
 
+// Ameise von oben mit leichter Perspektive: Was über dem Boden ist, erscheint um Höhe × persp nach oben
+// versetzt (wie von leicht unten-vorne betrachtet). So sieht man die Z-Gelenke: Knie stehen hoch,
+// ein gehobener Fuss löst sich vom Boden. Dazu ein weicher Schatten des Körpers auf dem Boden.
+// view.persp (Standard 0.7), view.feet = false: Füsse ohne farbige Markierung (Viewer).
 function drawAnt(ctx, ant, sx, sy, sc, view) {
-  const G = ANT_GEOM;
-  const P = (px, py) => { const p = toWorld(ant, px, py); return [sx(p.x), sy(p.y)]; };
+  const G = ANT_GEOM, persp = view.persp != null ? view.persp : 0.7;
+  const c = Math.cos(ant.heading), s = Math.sin(ant.heading);
+  const P = (px, py, z = 0) => [sx(ant.x + c * px - s * py), sy(ant.y + s * px + c * py + Math.max(0, z) * persp)];
+  const W = (p, z = 0) => [sx(p.x), sy(p.y + Math.max(0, z) * persp)];
+  const H = G.hipHeight, rot = -ant.heading;     // Bildschirm-y zeigt nach unten
   ctx.lineCap = "round"; ctx.lineJoin = "round";
 
-  // Beine: von oben gesehen; ein angehobenes Bein wirkt durch die Projektion kürzer
+  // Schatten des Körpers auf dem Boden
+  if (persp > 0) {
+    const a0 = ctx.globalAlpha;
+    ctx.globalAlpha = a0 * 0.13; ctx.fillStyle = cssVar("--ant-body");
+    for (const g of G.segments) {
+      const [cx, cy] = P(g.x, 0, 0);
+      ctx.beginPath(); ctx.ellipse(cx, cy, g.rx * sc * 1.05, g.ry * sc * 1.05, rot, 0, 2 * Math.PI); ctx.fill();
+    }
+    ctx.globalAlpha = a0;
+  }
+
+  // Beine: Hüfte auf Körperhöhe, Knie und Fuss in ihrer Höhe
   const legCol = cssVar("--ant-leg");
   G.legs.forEach((leg, l) => {
     const f = ant.feet[l];
-    const [hx, hy] = P(leg.hipX, leg.hipY), [kx, ky] = P(f.kx, f.ky), [fx, fy] = P(f.x, f.y);
+    const [hx, hy] = P(leg.hipX, leg.hipY, H), [kx, ky] = P(f.kx, f.ky, f.kz), [fx, fy] = P(f.x, f.y, f.z);
     ctx.strokeStyle = legCol;
     ctx.lineWidth = Math.max(1.5, 0.06 * sc);
     ctx.beginPath(); ctx.moveTo(hx, hy); ctx.lineTo(kx, ky); ctx.stroke();
     ctx.lineWidth = Math.max(1, 0.04 * sc);
     ctx.beginPath(); ctx.moveTo(kx, ky); ctx.lineTo(fx, fy); ctx.stroke();
     // Fuss: gefüllt = Bodenkontakt, rot = rutscht, Ring = in der Luft
+    if (view.feet === false) return;
     const r = Math.max(2.5, 0.05 * sc);
     ctx.beginPath(); ctx.arc(fx, fy, r, 0, 2 * Math.PI);
     if (ant.contact[l]) { ctx.fillStyle = cssVar(ant.slipping[l] ? "--slip" : "--stance"); ctx.fill(); }
     else { ctx.strokeStyle = cssVar("--swing"); ctx.lineWidth = 1.5; ctx.stroke(); }
   });
 
-  // Fühler (zweiteilig)
+  // Fühler (zweiteilig), leicht über dem Kopf getragen
+  const ant3 = antennaPoints(ant), zb = H + 0.05, ze = H + 0.17, zt = H + 0.12;
   ctx.strokeStyle = legCol; ctx.lineWidth = Math.max(1, 0.03 * sc);
-  for (const a of antennaPoints(ant)) {
-    ctx.beginPath();
-    ctx.moveTo(sx(a.base.x), sy(a.base.y)); ctx.lineTo(sx(a.elbow.x), sy(a.elbow.y)); ctx.lineTo(sx(a.tip.x), sy(a.tip.y));
-    ctx.stroke();
+  for (const a of ant3) {
+    const [bx, by] = W(a.base, zb), [ex, ey] = W(a.elbow, ze), [tx, ty] = W(a.tip, zt);
+    ctx.beginPath(); ctx.moveTo(bx, by); ctx.lineTo(ex, ey); ctx.lineTo(tx, ty); ctx.stroke();
   }
   // Fühlerspitzen = Duftsensoren
   if (view.sense) {
     const col = cssVar("--scent-rgb");
-    antennaPoints(ant).forEach((a) => {
-      ctx.beginPath(); ctx.arc(sx(a.tip.x), sy(a.tip.y), Math.max(2.5, 0.045 * sc), 0, 2 * Math.PI);
+    for (const a of ant3) {
+      const [tx, ty] = W(a.tip, zt);
+      ctx.beginPath(); ctx.arc(tx, ty, Math.max(2.5, 0.045 * sc), 0, 2 * Math.PI);
       ctx.fillStyle = `rgb(${col})`; ctx.fill();
-    });
+    }
   }
 
-  // Körper: Abdomen, Thorax, Kopf als Ellipsen
-  const rot = -ant.heading;     // Bildschirm-y zeigt nach unten
+  // Körper: Abdomen, Thorax, Kopf als Ellipsen auf Körperhöhe
   for (const g of [G.segments[2], G.segments[1], G.segments[0]]) {
-    const [cx, cy] = P(g.x, 0);
+    const [cx, cy] = P(g.x, 0, H);
     ctx.beginPath(); ctx.ellipse(cx, cy, g.rx * sc, g.ry * sc, rot, 0, 2 * Math.PI);
     ctx.fillStyle = cssVar("--ant-body"); ctx.fill();
     ctx.strokeStyle = cssVar("--ant-edge"); ctx.lineWidth = 1; ctx.stroke();

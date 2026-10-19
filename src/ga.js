@@ -131,7 +131,7 @@ function colonyToJSON(col, extra = {}) {
 function colonyFromJSON(o) {
   if (!o || o.format !== COLONY_FORMAT) throw new Error("Keine Kolonie-Datei der Neuronalen Ameisen");
   const col = createColony(o.seed, {
-    nets: o.members.map((m) => netFromJSON(m.net)), elite: o.elite, tournament: o.tournament,
+    nets: o.members.map((m) => brainFromJSON(m.net)), elite: o.elite, tournament: o.tournament,
     crossover: o.crossover, sigma: o.sigma, episode: o.episode, curriculum: o.curriculum,
   });
   o.members.forEach((m, i) => { col.members[i].id = m.id; col.members[i].parents = m.parents; });

@@ -41,6 +41,13 @@ r = S(`(() => {
 })()`);
 check("Lernstand speichern/laden: gleiches Netz, Zähler, Curriculum 6°, lernt weiter", r.same && r.gen === 4 && r.slope >= 6 && r.hist === 5 && r.bad, r);
 
+r = S(`(() => {
+  const net = createBrain(3);
+  const e = evaluate(net, { seconds: 2, world: { slopeDeg: 10 }, starts: [90, 50], slopeMix: [1, 0.5, 0] });
+  return { runs: e.runs, slopes: e.perStart.map((p, i) => i) .length };
+})()`);
+check("Bewertung über 2 Startrichtungen × 3 Neigungen = 6 Läufe", r.runs === 6, r);
+
 // Echter Lerntest: 150 Generationen (1200 Episoden) auf flachem Boden
 r = S(`(() => {
   const evo = createEvolution(1, { episode: { seconds: 10 } });

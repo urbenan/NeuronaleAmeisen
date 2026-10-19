@@ -8,7 +8,7 @@ globalThis.cfg = { count: +count, cols: files.map((f) => ({ name: f, data: JSON.
 const res = JSON.parse(S(`(() => {
   const all = [];
   for (const c of cfg.cols) c.data.members.forEach((m, i) => {
-    const net = netFromJSON(m.net);
+    const net = brainFromJSON(m.net);
     let score = 0, ok = 0;
     const per = {};
     for (const slope of [0, 10, 20]) {

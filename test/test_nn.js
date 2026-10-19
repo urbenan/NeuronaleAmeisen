@@ -18,7 +18,7 @@ r = S(`(() => {
            nIn: a.nIn, nOut: a.nOut, params: netParamCount(a) };
 })()`);
 check("Gleicher Startwert -> gleiches Netz, anderer -> anderes", r.same && r.differ, r);
-check("Topologie 28 -> 16 -> 18", r.nIn === 28 && r.nOut === 18 && r.params === 28 * 16 + 16 + 16 * 18 + 18, r);
+check("Topologie 30 -> 16 -> 18", r.nIn === 30 && r.nOut === 18 && r.params === 30 * 16 + 16 + 16 * 18 + 18, r);
 
 r = S(`(() => {
   const a = createBrain(1), b = netClone(a);
@@ -73,4 +73,22 @@ r = S(`(() => {
   return { worstReversalsPerJointPerS: worst };
 })()`);
 check("Kein Zittern: höchstens 30 Richtungswechsel pro Gelenk und Sekunde", r.worstReversalsPerJointPerS <= 30, r);
+// Steigungssinn: bergauf blickend vorne > 0; Hang links ansteigend -> seitlich > 0; flach 0
+r = S(`(() => {
+  const w = { slopeDeg: 20, slopeXDeg: 0 };
+  return { hoch: slopeSense(createAnt(0, 0, 90 * DEG), w), runter: slopeSense(createAnt(0, 0, -90 * DEG), w),
+           quer: slopeSense(createAnt(0, 0, 0), w), flach: slopeSense(createAnt(0, 0, 33 * DEG), { slopeDeg: 0 }) };
+})()`);
+check("Steigungssinn: 20° bergauf ≈ +0.86, bergab ≈ −0.86, quer: seitlich +0.86, flach 0",
+  Math.abs(r.hoch[0] - 0.855) < 0.01 && Math.abs(r.runter[0] + 0.855) < 0.01 && Math.abs(r.quer[1] - 0.855) < 0.01 && Math.abs(r.quer[0]) < 1e-9 && r.flach.every((v) => v === 0), r);
+
+// Alte Netze (28 Eingänge) laden: neue Eingänge mit Gewicht 0, gleiche Ausgaben
+r = S(`(() => {
+  const old = createNet(28, 16, 18, makeRng(9));
+  const o = netToJSON(old), net = brainFromJSON(o);
+  const x28 = Array.from({ length: 28 }, (_, i) => Math.sin(i)), x30 = [...x28, 0.7, -0.4];
+  const a = Array.from(netForward(old, x28)), b = Array.from(netForward(net, x30));
+  return { nIn: net.nIn, maxDiff: Math.max(...a.map((v, i) => Math.abs(v - b[i]))) };
+})()`);
+check("Altes Netz (28 Eingänge) wird auf 30 erweitert und rechnet gleich (bis auf Rundung beim Speichern)", r.nIn === 30 && r.maxDiff < 1e-4, r);
 done();

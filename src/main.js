@@ -7,7 +7,7 @@ const gait = { ...GAIT_DEFAULTS };
 const start = { headingDeg: 90 };
 const view = { cx: 0, cy: 0, scale: 120, trail: [], showForces: true, forceScale: 0, sense: true };
 
-let netSeed = 1, ctrl = createController(createBrain(netSeed));
+let netSeed = 1, ctrl = createController(createBrain(netSeed), BRAIN_DEFAULTS, world);
 // Kolonie-Vorführung: die gewählte Ameise ist `ant`/`ctrl`, alle anderen laufen in `swarm` mit
 let swarm = [], selected = null;   // selected = { id, rank }
 const netView = { mode: "weights", hover: null, pinned: false };
@@ -42,7 +42,7 @@ const SLIDERS = [
 ];
 // Lern-Einstellungen
 const learn = { on: false, tempo: "fast", evo: null, envKey: "", rate: 0, seconds: 15, lambda: 8, slipWeight: 1,
-  curriculum: true, target: 20, step: 2, starts: 3, demoIdx: 0,
+  curriculum: true, target: 20, step: 2, starts: 3, mix: 3, demoIdx: 0,
   method: "colony", size: GA_DEFAULTS.size, gaSigma: GA_DEFAULTS.sigma, crossover: GA_DEFAULTS.crossover };
 const START_SETS = { 1: [90], 3: [90, 50, 130] };
 SLIDERS.push(
@@ -299,6 +299,7 @@ function learnEpisodeOpts() {
     seconds: learn.seconds, slipWeight: learn.slipWeight,
     world: { slopeDeg: world.slopeDeg, mu: world.mu }, scent: { ...world.scent },
     starts: learnStarts(),
+    slopeMix: learn.mix === 3 ? [1, 0.5, 0] : null,
   };
 }
 
@@ -351,7 +352,7 @@ function restartDemo() {
   reset(heading);
   swarm = [];
   if (!isColony(L)) {
-    ctrl = createController(netClone(L.parent));
+    ctrl = createController(netClone(L.parent), BRAIN_DEFAULTS, world);
     ctrl.gen = L.generation;
     selected = null;
     return;
@@ -360,7 +361,7 @@ function restartDemo() {
   const keep = selected && list.find((m) => m.id === selected.id);
   const pick = keep || list[0];
   for (const m of list) {
-    const c = createController(netClone(m.net));
+    const c = createController(netClone(m.net), BRAIN_DEFAULTS, world);
     Object.assign(c, { gen: L.generation, id: m.id, rank: m.rank, res: m.res, parents: m.parents });
     if (m === pick) { ctrl = c; selected = { id: m.id, rank: m.rank }; }
     else swarm.push({ ant: createAnt(0, 0, heading * DEG), ctrl: c });
@@ -415,6 +416,7 @@ $("cur-on").addEventListener("change", (e) => {
   updateSliderStates();
 });
 document.querySelectorAll('input[name="starts"]').forEach((r) => r.addEventListener("change", () => { learn.starts = +r.value; }));
+document.querySelectorAll('input[name="mix"]').forEach((r) => r.addEventListener("change", () => { learn.mix = +r.value; }));
 
 function setLearning(on) {
   learn.on = on;
@@ -436,7 +438,7 @@ document.querySelectorAll('input[name="tempo"]').forEach((r) => r.addEventListen
 // Neues Zufallsnetz: Lernen beginnt von vorn
 function newNet() {
   netSeed = 1 + Math.floor(Math.random() * 99999);
-  ctrl = createController(createBrain(netSeed));
+  ctrl = createController(createBrain(netSeed), BRAIN_DEFAULTS, world);
   learn.evo = null; learn.envKey = ""; learn.rate = 0; learn.demoIdx = 0;
   swarm = []; selected = null;
   try { localStorage.removeItem(STORE_KEY); } catch (e) { /* egal */ }
@@ -484,7 +486,7 @@ function drawSwarmInfo() {
 // ---------- Lernstand sichern ----------
 // Automatisch im Browser (localStorage, alle 5 s beim Lernen und beim Pausieren) und als Datei.
 const STORE_KEY = "neuronale-ameisen-lernstand";
-const UI_KEYS = ["seconds", "lambda", "slipWeight", "curriculum", "target", "step", "starts", "method", "size", "gaSigma", "crossover"];
+const UI_KEYS = ["seconds", "lambda", "slipWeight", "curriculum", "target", "step", "starts", "mix", "method", "size", "gaSigma", "crossover"];
 
 function saveState() {
   const extra = { netSeed, ui: Object.fromEntries(UI_KEYS.map((k) => [k, learn[k]])), mu: world.mu };
@@ -507,6 +509,7 @@ function applyState(o, source) {
   learn.evo = evo;
   netSeed = o.netSeed || evo.seed;
   if (o.ui) for (const k of UI_KEYS) if (k in o.ui) learn[k] = o.ui[k];
+  if (!o.ui || !("mix" in o.ui)) learn.mix = o.episode && o.episode.slopeMix ? 3 : 1;   // ältere Dateien
   if (o.mu) world.mu = o.mu;
   if (evo.episode.scent) Object.assign(world.scent, evo.episode.scent);
   if (evo.episode.starts) start.headingDeg = evo.episode.starts[0];
@@ -517,6 +520,7 @@ function applyState(o, source) {
   for (const e of sliderEls) { e.inp.value = e.s.obj[e.s.key]; e.out.textContent = e.s.fmt(e.s.obj[e.s.key]); }
   $("cur-on").checked = learn.curriculum;
   $("st-" + learn.starts).checked = true;
+  $("mx-" + learn.mix).checked = true;
   learn.method = isColony(evo) ? "colony" : "single";
   $(isColony(evo) ? "me-colony" : "me-single").checked = true;
   methodText();

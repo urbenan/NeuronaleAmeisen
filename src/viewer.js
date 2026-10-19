@@ -20,8 +20,8 @@ const rng = makeRng(Date.now() >>> 0);
 
 // ---------- Netze laden ----------
 function netsFrom(o) {
-  if (o.members) return o.members.map((m) => netFromJSON(m.net));     // Kolonie
-  if (o.net) return [netFromJSON(o.net)];                             // eine Ameise
+  if (o.members) return o.members.map((m) => brainFromJSON(m.net));     // Kolonie
+  if (o.net) return [brainFromJSON(o.net)];                             // eine Ameise
   throw new Error("Keine Ameisen in der Datei");
 }
 function describe(o) {
@@ -56,7 +56,7 @@ function useSource(key) {
   if (!nets) { nets = Array.from({ length: 12 }, (_, i) => createBrain(i + 1)); sourceName = "Zufallsnetze (noch nichts gelernt)"; }
   // eine einzelne Ameise: mehrere Kopien laufen lassen
   while (nets.length < 8) nets = nets.concat(nets.map(netClone)).slice(0, 8);
-  ants = nets.slice(0, 32).map((net) => spawn({ ctrl: createController(net) }, true));
+  ants = nets.slice(0, 32).map((net) => spawn({ ctrl: createController(net, BRAIN_DEFAULTS, world) }, true));
   arrived = 0;
   try { localStorage.setItem("neuronale-ameisen-viewer-quelle", s ? s.key : ""); } catch (e) { /* egal */ }
 }
@@ -157,7 +157,7 @@ $("file-in").onchange = (e) => {
     try { localStorage.setItem(VIEWER_STORE, t); } catch (err) { /* zu gross: nur jetzt verwenden */ }
     fillSourceMenu("file");
     useSource("file");
-    if (!sources().some((s) => s.key === "file")) { ants = netsFrom(o).map((net) => spawn({ ctrl: createController(net) }, true)); }
+    if (!sources().some((s) => s.key === "file")) { ants = netsFrom(o).map((net) => spawn({ ctrl: createController(net, BRAIN_DEFAULTS, world) }, true)); }
     message(`Geladen: <b>${f.name}</b><br>${describe(o)}`);
   }).catch((err) => message("Laden fehlgeschlagen: " + err.message));
   e.target.value = "";
@@ -182,17 +182,9 @@ function draw() {
   const { ctx, w, h } = fitCanvas(cv);
   const sc = field.scale;
   const sx = (x) => (x - field.x0) * sc, sy = (y) => (field.y1 - y) * sc;
-  // Boden: heller unten, dunkler oben je nach Neigung
-  const g = ctx.createLinearGradient(0, h, 0, 0);
-  const k = Math.max(0, Math.min(1, 0.5 + world.slopeDeg / 60));
-  g.addColorStop(0, cssVar("--ground-lo"));
-  g.addColorStop(1, mix(cssVar("--ground-lo"), cssVar("--ground-hi"), k));
-  ctx.fillStyle = g; ctx.fillRect(0, 0, w, h);
-  ctx.strokeStyle = cssVar("--grid"); ctx.lineWidth = 1;
-  for (let x = Math.ceil(field.x0); x <= field.x1; x += 2) { ctx.beginPath(); ctx.moveTo(sx(x), 0); ctx.lineTo(sx(x), h); ctx.stroke(); }
-  for (let y = Math.ceil(field.y0); y <= field.y1; y += 2) { ctx.beginPath(); ctx.moveTo(0, sy(y)); ctx.lineTo(w, sy(y)); ctx.stroke(); }
-  drawScent(ctx, world.scent, sx, sy, sc, false);
-  const v = { showForces: false, sense: false };
+  ctx.fillStyle = cssVar("--bg"); ctx.fillRect(0, 0, w, h);
+  drawScent(ctx, world.scent, sx, sy, sc, false, false);   // nur Farbverlauf, keine Kreise
+  const v = { showForces: false, sense: false, feet: false };
   for (const m of ants) drawAnt(ctx, m.ant, sx, sy, sc, v);
   drawSlopeArrow(ctx, w, h);
 }
@@ -207,16 +199,6 @@ function drawSlopeArrow(ctx, w, h) {
   ctx.font = "11px " + cssVar("--font-num"); ctx.textAlign = "center";
   ctx.fillText("bergab", cx, cy + 34);
 }
-function mix(a, b, t) {
-  const p = (c) => hexRgb(c);
-  const A = p(a), B = p(b);
-  return `rgb(${A.map((v, i) => Math.round(v + (B[i] - v) * t)).join(",")})`;
-}
-function hexRgb(s) {
-  if (s.startsWith("#")) return [1, 3, 5].map((i) => parseInt(s.slice(i, i + 2), 16));
-  return s.match(/\d+/g).slice(0, 3).map(Number);
-}
-
 // ---------- Schleife ----------
 let last = performance.now(), acc = 0;
 function frame(now) {

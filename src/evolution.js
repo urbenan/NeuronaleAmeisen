@@ -12,6 +12,7 @@ const EPISODE_DEFAULTS = {
   scent: {},              // Abweichungen von SCENT_DEFAULTS
   start: { x: 0, y: 0, headingDeg: 90 },
   starts: null,           // mehrere Startrichtungen, z. B. [90, 50, 130]: Fitness = Mittelwert (zwingt zum Duft-Folgen)
+  slopeMix: null,         // mehrere Neigungen als Anteil der aktuellen, z. B. [1, 0.5, 0]: verlernt das Flache nicht
   slipWeight: 1,          // 1: nur der Weg mit haftenden Füssen zählt (Fitness × (1 − Rutschanteil))
 };
 
@@ -29,7 +30,7 @@ function runEpisode(net, opts = {}) {
   const world = { ...WORLD_DEFAULTS, ...o.world };
   const scent = { ...SCENT_DEFAULTS, ...o.scent };
   const ant = createAnt(o.start.x, o.start.y, o.start.headingDeg * DEG);
-  const ctrl = createController(net, { ...BRAIN_DEFAULTS, ...(o.brain || {}) });
+  const ctrl = createController(net, { ...BRAIN_DEFAULTS, ...(o.brain || {}) }, world);
   const dt = PHYSICS_DT, steps = Math.round(o.seconds / dt);
   const d0 = Math.hypot(ant.x - scent.x, ant.y - scent.y);
   const trail = o.trail ? [{ x: ant.x, y: ant.y }] : null;
@@ -49,11 +50,18 @@ function runEpisode(net, opts = {}) {
   return { fitness, progress, reached, seconds: t, slipFrac, x: ant.x, y: ant.y, trail };
 }
 
-// Bewertung über alle Startrichtungen: Mittelwerte; Ziel gilt als erreicht, wenn es bei allen Starts klappt
+// Bewertung über alle Startrichtungen (und ggf. Neigungen): Mittelwerte; Ziel gilt als erreicht,
+// wenn es bei allen Läufen klappt
 function evaluate(net, opts = {}) {
   const starts = opts.starts && opts.starts.length ? opts.starts : null;
-  if (!starts) { const r = runEpisode(net, opts); return { ...r, reachedCount: r.reached !== null ? 1 : 0, runs: 1 }; }
-  const res = starts.map((h) => runEpisode(net, { ...opts, start: { x: 0, y: 0, headingDeg: h } }));
+  const mix = opts.slopeMix && opts.slopeMix.length ? opts.slopeMix : null;
+  if (!starts && !mix) { const r = runEpisode(net, opts); return { ...r, reachedCount: r.reached !== null ? 1 : 0, runs: 1 }; }
+  const w = { ...EPISODE_DEFAULTS.world, ...(opts.world || {}) };
+  const heads = starts || [(opts.start || EPISODE_DEFAULTS.start).headingDeg];
+  const res = [];
+  for (const h of heads) for (const f of mix || [1]) {
+    res.push(runEpisode(net, { ...opts, start: { x: 0, y: 0, headingDeg: h }, world: { ...w, slopeDeg: w.slopeDeg * f } }));
+  }
   const mean = (k) => res.reduce((a, r) => a + r[k], 0) / res.length;
   const reachedCount = res.filter((r) => r.reached !== null).length;
   return {
@@ -147,7 +155,7 @@ function evoToJSON(evo, extra = {}) {
 function evoFromJSON(o) {
   if (!o || o.format !== SAVE_FORMAT) throw new Error("Keine Lernstand-Datei der Neuronalen Ameisen");
   const evo = createEvolution(o.seed, {
-    parent: netFromJSON(o.net), lambda: o.lambda, sigma: o.sigma, sigmaMin: o.sigmaMin,
+    parent: brainFromJSON(o.net), lambda: o.lambda, sigma: o.sigma, sigmaMin: o.sigmaMin,
     episode: o.episode, curriculum: o.curriculum,
   });
   evo.rng = makeRng((o.seed ^ o.generation * 2654435761) >>> 0);

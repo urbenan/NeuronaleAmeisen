@@ -20,9 +20,9 @@
   --grid-major: rgba(90, 70, 30, 0.32);
   --goal: #1d7a3a;
   --trail: rgba(31, 78, 121, 0.45);
-  --ant-body: #3b2417;
-  --ant-edge: #1e110a;
-  --ant-leg: #4a2e1d;
+  --ant-body: #17110d;
+  --ant-edge: #000000;
+  --ant-leg: #241a14;
   --stance: #1f4e79;
   --swing: #8a6d55;
   --slip: #d23b2f;
@@ -213,6 +213,13 @@ button:focus-visible, input:focus-visible, .seg input:focus-visible + label { ou
               <input type="radio" name="starts" id="st-3" value="3" checked><label for="st-3">3 (dazu ±40°)</label>
             </div>
           </div>
+          <div class="group">
+            <span class="lab">Neigungen</span>
+            <div class="seg" role="radiogroup">
+              <input type="radio" name="mix" id="mx-1" value="1"><label for="mx-1">nur aktuelle</label>
+              <input type="radio" name="mix" id="mx-3" value="3" checked><label for="mx-3">aktuelle, halbe, flach</label>
+            </div>
+          </div>
         </div>
         <div class="sliders" id="learn-sliders"></div>
         <p class="small" id="lr-store">Der Lernstand wird automatisch in diesem Browser gesichert.</p>
@@ -231,7 +238,7 @@ button:focus-visible, input:focus-visible, .seg input:focus-visible + label { ou
         <canvas id="curve" aria-label="Lernkurve: Fitness über die Episoden"></canvas>
         <div class="legend"><span><span class="dot" style="background:var(--accent)"></span>Fitness bestes Netz</span><span><span class="dot" style="background:var(--muted);opacity:.5"></span><span id="dots-what">bester Versuch einer Generation</span></span><span><span class="dot" style="background:var(--goal)"></span>Neigung (rechte Achse)</span></div>
         <p class="small" id="method-text"></p>
-        <p class="small"> <b>Fitness</b> = Weg zur Duftquelle in cm × (1 − Anteil rutschender Füsse), am Ziel Bonus + 2 pro gesparte Sekunde – je schneller oben, desto besser. Bei 3 Startrichtungen zählt der Mittelwert: Wer schräg startet, muss mit den Fühlern den Weg nach oben finden. <b>Curriculum</b>: Kommt das beste Netz bei allen Starts oben an, wird der Hang um eine Stufe steiler. Direkt am steilen Hang lernt die Ameise nur stillzustehen. Die Welt zeigt immer das aktuell beste Netz, reihum aus allen Startrichtungen.</p>
+        <p class="small"> <b>Fitness</b> = Weg zur Duftquelle in cm × (1 − Anteil rutschender Füsse), am Ziel Bonus + 2 pro gesparte Sekunde – je schneller oben, desto besser. Bei 3 Startrichtungen zählt der Mittelwert: Wer schräg startet, muss mit den Fühlern den Weg nach oben finden. Mit «aktuelle, halbe, flach» läuft jede Ameise zusätzlich bei halber Neigung und flach – so verlernt sie das Flache nicht und lernt, ihren <b>Steigungssinn</b> (Eingänge «Hang vorne/seitlich») zu nutzen. <b>Curriculum</b>: Kommt das beste Netz bei allen Starts oben an, wird der Hang um eine Stufe steiler. Direkt am steilen Hang lernt die Ameise nur stillzustehen. Die Welt zeigt immer das aktuell beste Netz, reihum aus allen Startrichtungen.</p>
       </div>
     </div>
   </section>

@@ -78,7 +78,9 @@ function netToJSON(net) {
   return { nIn: net.nIn, nHid: net.nHid, nOut: net.nOut, W1: r(net.W1), b1: r(net.b1), W2: r(net.W2), b2: r(net.b2) };
 }
 
-function netFromJSON(o) {
+// nIn > o.nIn: zusätzliche Eingänge (am Ende) mit Gewicht 0 – das Netz rechnet genau wie vorher
+function netFromJSON(o, nIn = o.nIn) {
+  if (nIn > o.nIn) o = { ...o, nIn, W1: o.W1.concat(new Array((nIn - o.nIn) * o.nHid).fill(0)) };
   const net = createNet(o.nIn, o.nHid, o.nOut, () => 0.5);
   for (const k of ["W1", "b1", "W2", "b2"]) {
     if (o[k].length !== net[k].length) throw new Error(`Netz-Datei passt nicht: ${k} hat ${o[k].length} statt ${net[k].length} Werte`);

@@ -7,27 +7,14 @@
 <style>
 /* Vollbild nur mit Ameisen. Farben wie die Hauptseite (index.html). */
 :root {
-  --bg: #eef1f4; --surface: #ffffff; --ink: #1b2733; --muted: #5b6875; --line: #d4dbe2; --accent: #1f4e79;
-  --ground-lo: #f3ecd9; --ground-hi: #d9c9a0; --grid: rgba(90, 70, 30, 0.10);
-  --ant-body: #3b2417; --ant-edge: #1e110a; --ant-leg: #4a2e1d;
+  /* immer hell: schwarze Ameisen auf weissem Grund */
+  --bg: #ffffff; --surface: #ffffff; --ink: #1b2733; --muted: #6b7682; --line: #dde2e7; --accent: #1f4e79;
+  --ant-body: #0b0b0b; --ant-edge: #000000; --ant-leg: #141414;
   --stance: #1f4e79; --swing: #8a6d55; --slip: #d23b2f; --force: #c0571b;
-  --scent-rgb: 142, 68, 173; --hud: rgba(255, 255, 255, 0.82);
+  --scent-rgb: 142, 68, 173; --hud: rgba(255, 255, 255, 0.85);
   --font-ui: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
   --font-num: ui-monospace, "SF Mono", Menlo, Consolas, "Liberation Mono", monospace;
-}
-@media (prefers-color-scheme: dark) {
-  :root:not([data-theme="light"]) {
-    --bg: #10161c; --surface: #18212a; --ink: #e2e8ee; --muted: #94a2b0; --line: #2b3742; --accent: #8dbbe8;
-    --ground-lo: #2a261d; --ground-hi: #4a4029; --grid: rgba(240, 220, 170, 0.07);
-    --ant-body: #1a0f09; --ant-edge: #c9a585; --ant-leg: #d8b898; --stance: #8dbbe8; --swing: #b89a80;
-    --scent-rgb: 205, 150, 240; --hud: rgba(24, 33, 42, 0.82); color-scheme: dark;
-  }
-}
-:root[data-theme="dark"] {
-  --bg: #10161c; --surface: #18212a; --ink: #e2e8ee; --muted: #94a2b0; --line: #2b3742; --accent: #8dbbe8;
-  --ground-lo: #2a261d; --ground-hi: #4a4029; --grid: rgba(240, 220, 170, 0.07);
-  --ant-body: #1a0f09; --ant-edge: #c9a585; --ant-leg: #d8b898; --stance: #8dbbe8; --swing: #b89a80;
-  --scent-rgb: 205, 150, 240; --hud: rgba(24, 33, 42, 0.82); color-scheme: dark;
+  color-scheme: light;
 }
 * { box-sizing: border-box; }
 html, body { margin: 0; height: 100%; background: var(--bg); color: var(--ink); overflow: hidden;
