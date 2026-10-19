@@ -302,11 +302,6 @@ function draw() {
   // Zentrum der Duftquelle: kleiner zarter Kreis
   ctx.strokeStyle = `rgba(${cssVar("--scent-rgb")}, 0.55)`; ctx.lineWidth = 1.5;
   ctx.beginPath(); ctx.arc(sx(world.scent.x), sy(world.scent.y), 7, 0, 2 * Math.PI); ctx.stroke();
-  // beim Herauszoomen: Rand der Fläche, in der die Ameisen laufen
-  if (cam.zoom < 1) {
-    ctx.strokeStyle = cssVar("--line"); ctx.lineWidth = 1;
-    ctx.strokeRect(sx(field.x0), sy(field.y1), (field.x1 - field.x0) * sc, (field.y1 - field.y0) * sc);
-  }
   const v = { showForces: false, sense: false, feet: false };
   for (const m of ants) drawAnt(ctx, m.ant, sx, sy, sc, v);
   drawSlopeArrow(ctx, w, h);
