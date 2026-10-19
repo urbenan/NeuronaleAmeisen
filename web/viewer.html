@@ -815,6 +815,7 @@ const GAIT_HISTORY = 240;
 // Viewer fürs iPhone: trainierte Ameisen im Vollbild, die Neigung kommt vom Lagesensor.
 // Bildschirm = Boden. Oberkante anheben -> bergauf nach oben, seitlich kippen -> seitlich geneigt.
 // «Nullpunkt»: aktuelle Haltung gilt als flach. Antippen versetzt die Duftquelle.
+// Zwei Finger: zoomen (und verschieben), ein Finger ziehen: verschieben, Doppeltippen: Gesamtansicht.
 // Wer an der Duftquelle ankommt oder aus dem Bild rutscht, startet unten neu.
 
 // Beim Bündeln (build_web.py) wird hier eine trainierte Kolonie eingesetzt
@@ -829,7 +830,9 @@ const world = { ...WORLD_DEFAULTS, slopeDeg: 0, slopeXDeg: 0, scent: { ...SCENT_
 const cv = document.getElementById("cv");
 const $ = (id) => document.getElementById(id);
 let ants = [], arrived = 0, sourceName = "";
-let field = { w: 0, h: 0, scale: 30, x0: 0, x1: 0, y0: 0, y1: 0 };
+let field = { w: 0, h: 0, scale: 30, x0: 0, x1: 0, y0: 0, y1: 0 };   // Simulationsfläche
+const cam = { zoom: 1, cx: 0, cy: 0 };                                   // Kamera (nur Ansicht)
+const ZOOM_MIN = 0.6, ZOOM_MAX = 6;
 const rng = makeRng(Date.now() >>> 0);
 
 // ---------- Netze laden ----------
@@ -881,6 +884,19 @@ function layout() {
   const scale = w / FIELD_CM;
   field = { w, h, scale, x0: -w / 2 / scale, x1: w / 2 / scale, y0: -1.5, y1: h / scale - 1.5 };
   if (!world.scent.placed) { world.scent.x = 0; world.scent.y = field.y1 - 2; }
+  if (cam.zoom === 1) resetCam();
+}
+function resetCam() {
+  cam.zoom = 1; cam.cx = (field.x0 + field.x1) / 2; cam.cy = (field.y0 + field.y1) / 2;
+}
+// Bildschirm <-> Welt über die Kamera
+function camScale() { return field.scale * cam.zoom; }
+function toScreen(x, y) { return [field.w / 2 + (x - cam.cx) * camScale(), field.h / 2 - (y - cam.cy) * camScale()]; }
+function toWorldXY(px, py) { return [cam.cx + (px - field.w / 2) / camScale(), cam.cy - (py - field.h / 2) / camScale()]; }
+function clampCam() {
+  cam.zoom = Math.max(ZOOM_MIN, Math.min(ZOOM_MAX, cam.zoom));
+  cam.cx = Math.max(field.x0, Math.min(field.x1, cam.cx));
+  cam.cy = Math.max(field.y0, Math.min(field.y1, cam.cy));
 }
 function spawn(m, scatter = false) {
   const margin = 1;
@@ -981,26 +997,86 @@ $("help").onclick = () => message(
   `• <b>iPhone neigen</b> = Hang neigen: Oberkante hoch → bergauf zur Duftquelle. Seitlich kippen → seitlicher Hang.<br>` +
   `• <b>Nullpunkt</b>: so wie du das iPhone gerade hältst, gilt als flach.<br>` +
   `• <b>Antippen</b>: Duftquelle dorthin setzen.<br>` +
+  `• <b>Zwei Finger</b>: zoomen · <b>ziehen</b>: verschieben · <b>doppelt tippen</b>: ganze Fläche.<br>` +
   `• Gelernt wurde bis etwa 20° – steiler rutschen sie ab.<br><br>${sourceName}`);
+// Gesten: Antippen = Duftquelle setzen, ziehen = verschieben, zwei Finger = zoomen, doppelt = Gesamtansicht
+const pointers = new Map();
+let gesture = null, lastTap = 0;
+function localXY(e) { const b = cv.getBoundingClientRect(); return [e.clientX - b.left, e.clientY - b.top]; }
+function startGesture() {
+  const pts = [...pointers.values()];
+  const mx = pts.reduce((a, p) => a + p[0], 0) / pts.length, my = pts.reduce((a, p) => a + p[1], 0) / pts.length;
+  const dist = pts.length > 1 ? Math.hypot(pts[0][0] - pts[1][0], pts[0][1] - pts[1][1]) : 0;
+  gesture = { n: pts.length, mx, my, dist, zoom: cam.zoom, anchor: toWorldXY(mx, my), moved: gesture ? gesture.moved : 0, multi: (gesture && gesture.multi) || pts.length > 1 };
+}
 cv.addEventListener("pointerdown", (e) => {
   showBar();
-  const b = cv.getBoundingClientRect();
-  world.scent.x = field.x0 + (e.clientX - b.left) / field.scale;
-  world.scent.y = field.y1 - (e.clientY - b.top) / field.scale;
-  world.scent.placed = true;
+  cv.setPointerCapture(e.pointerId);
+  pointers.set(e.pointerId, localXY(e));
+  if (pointers.size === 1) gesture = null;
+  startGesture();
 });
+cv.addEventListener("pointermove", (e) => {
+  if (!pointers.has(e.pointerId) || !gesture) return;
+  pointers.set(e.pointerId, localXY(e));
+  const pts = [...pointers.values()];
+  const mx = pts.reduce((a, p) => a + p[0], 0) / pts.length, my = pts.reduce((a, p) => a + p[1], 0) / pts.length;
+  gesture.moved = Math.max(gesture.moved, Math.hypot(mx - gesture.mx, my - gesture.my));
+  if (pts.length > 1 && gesture.dist > 0) {
+    cam.zoom = gesture.zoom * Math.hypot(pts[0][0] - pts[1][0], pts[0][1] - pts[1][1]) / gesture.dist;
+    gesture.moved = Math.max(gesture.moved, 99);
+  }
+  if (gesture.moved < 8) return;
+  // der Weltpunkt unter den Fingern bleibt unter den Fingern
+  cam.zoom = Math.max(ZOOM_MIN, Math.min(ZOOM_MAX, cam.zoom));
+  cam.cx = gesture.anchor[0] - (mx - field.w / 2) / camScale();
+  cam.cy = gesture.anchor[1] + (my - field.h / 2) / camScale();
+  clampCam();
+});
+function endPointer(e) {
+  if (!pointers.has(e.pointerId)) return;
+  const [px, py] = pointers.get(e.pointerId);
+  pointers.delete(e.pointerId);
+  if (pointers.size > 0) { startGesture(); return; }          // ein Finger bleibt: weiter verschieben
+  const tap = gesture && !gesture.multi && gesture.moved < 8 && e.type === "pointerup";
+  gesture = null;
+  if (!tap) return;
+  const now = performance.now();
+  if (now - lastTap < 300) { resetCam(); lastTap = 0; return; }   // Doppeltippen
+  lastTap = now;
+  [world.scent.x, world.scent.y] = toWorldXY(px, py);
+  world.scent.placed = true;
+}
+cv.addEventListener("pointerup", endPointer);
+cv.addEventListener("pointercancel", endPointer);
+// Mausrad (Computer): zoomen um den Mauszeiger
+cv.addEventListener("wheel", (e) => {
+  e.preventDefault();
+  const [px, py] = localXY(e), [wx, wy] = toWorldXY(px, py);
+  cam.zoom *= Math.exp(-e.deltaY * 0.0015);
+  cam.zoom = Math.max(ZOOM_MIN, Math.min(ZOOM_MAX, cam.zoom));
+  cam.cx = wx - (px - field.w / 2) / camScale(); cam.cy = wy + (py - field.h / 2) / camScale();
+  clampCam();
+}, { passive: false });
+// iPhone-Safari: eigene Seiten-Zoomgeste unterdrücken
+document.addEventListener("gesturestart", (e) => e.preventDefault());
 window.addEventListener("resize", layout);
 
 // ---------- Zeichnen ----------
 function draw() {
   const { ctx, w, h } = fitCanvas(cv);
-  const sc = field.scale;
-  const sx = (x) => (x - field.x0) * sc, sy = (y) => (field.y1 - y) * sc;
+  const sc = camScale();
+  const sx = (x) => w / 2 + (x - cam.cx) * sc, sy = (y) => h / 2 - (y - cam.cy) * sc;
   ctx.fillStyle = cssVar("--bg"); ctx.fillRect(0, 0, w, h);
   drawScent(ctx, world.scent, sx, sy, sc, false, false);   // nur Farbverlauf, keine Kreise
   // Zentrum der Duftquelle: kleiner zarter Kreis
   ctx.strokeStyle = `rgba(${cssVar("--scent-rgb")}, 0.55)`; ctx.lineWidth = 1.5;
   ctx.beginPath(); ctx.arc(sx(world.scent.x), sy(world.scent.y), 7, 0, 2 * Math.PI); ctx.stroke();
+  // beim Herauszoomen: Rand der Fläche, in der die Ameisen laufen
+  if (cam.zoom < 1) {
+    ctx.strokeStyle = cssVar("--line"); ctx.lineWidth = 1;
+    ctx.strokeRect(sx(field.x0), sy(field.y1), (field.x1 - field.x0) * sc, (field.y1 - field.y0) * sc);
+  }
   const v = { showForces: false, sense: false, feet: false };
   for (const m of ants) drawAnt(ctx, m.ant, sx, sy, sc, v);
   drawSlopeArrow(ctx, w, h);
