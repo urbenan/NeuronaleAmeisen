@@ -33,3 +33,15 @@ hinauf zu laufen und einem Duftgradienten zu folgen. Läuft im Browser (2D von o
 6. ✅ Lernstand automatisch im Browser + als .json, `build_web.py` -> `web/` (eine Datei, Manifest, Service Worker, Icons)
    – offen: Veröffentlichen auf GitHub Pages
 7. Später: viele Ameisen, GA, 3D
+
+## Nachahmungslernen (nach Schritt 7)
+- Befund: Evolution von Zufallsnetzen aus findet nur "Schrubbel-Gänge" (≈50 % rutschende Kontakte);
+  am Hang reicht das nicht (20°: 17 %, 25°: 0 % kommen oben an). Die Physik ist nicht die Grenze:
+  der programmierte Dreifuss-Gang läuft bis 25° fast mit voller Geschwindigkeit ohne Rutschen.
+- Steigungssinn (Eingänge Hang vorne/seitlich) + Neigungsmix allein brachten keinen klaren Gewinn.
+- Lösung: Netz lernt den Dreifuss-Gang per Backpropagation nachzuahmen (DAgger, `src/imitate.js`).
+  Wichtig: Der Lehrer muss über dieselben trägen Muskeln steuern; nur vorauszurechnen reichte nicht
+  (Ausschlag auf 73 % gedämpft, Bauch schleift). Umkehrung des Muskelfilters: u = Ziel + τ·Ziel'.
+- Ergebnis: 8 Individuen mit eigenem Gangstil, alle 100 % oben bei 0°–25° (3 Startrichtungen).
+- Der Gang ist empfindlich: Mutation σ 0.01 senkt den Erfolg auf ~70 %. Evolution danach nur mit
+  sehr feiner Mutation (σ ≈ 0.004).

@@ -29,6 +29,7 @@ function netsFrom(o) {
   throw new Error("Keine Ameisen in der Datei");
 }
 function describe(o) {
+  if (o.viewerInfo) return o.viewerInfo;
   const kind = o.members ? `Kolonie, ${o.members.length} Ameisen` : "eine Ameise";
   const slope = o.curriculum ? o.curriculum.slope : o.episode && o.episode.world ? o.episode.world.slopeDeg : 0;
   return `${kind}, Generation ${o.generation}, gelernt bis ${slope}°`;
@@ -59,7 +60,7 @@ function useSource(key) {
   }
   if (!nets) { nets = Array.from({ length: 12 }, (_, i) => createBrain(i + 1)); sourceName = "Zufallsnetze (noch nichts gelernt)"; }
   // eine einzelne Ameise: mehrere Kopien laufen lassen
-  while (nets.length < 8) nets = nets.concat(nets.map(netClone)).slice(0, 8);
+  while (nets.length < 16) nets = nets.concat(nets.map(netClone)).slice(0, 16);   // wenige Individuen: doppelt
   ants = nets.slice(0, 32).map((net) => spawn({ ctrl: createController(net, BRAIN_DEFAULTS, world) }, true));
   arrived = 0;
   try { localStorage.setItem("neuronale-ameisen-viewer-quelle", s ? s.key : ""); } catch (e) { /* egal */ }
@@ -185,7 +186,7 @@ $("help").onclick = () => message(
   `• <b>Nullpunkt</b>: so wie du das iPhone gerade hältst, gilt als flach.<br>` +
   `• <b>Antippen</b>: Duftquelle dorthin setzen.<br>` +
   `• <b>Zwei Finger</b>: zoomen · <b>ziehen</b>: verschieben · <b>doppelt tippen</b>: ganze Fläche.<br>` +
-  `• Gelernt wurde bis etwa 20° – steiler rutschen sie ab.<br><br>${sourceName}<br><span style="color:var(--muted)">Version ${BUILD}</span>`);
+  `• Getestet bis 25° – noch steiler rutschen sie irgendwann ab.<br><br>${sourceName}<br><span style="color:var(--muted)">Version ${BUILD}</span>`);
 // Gesten: Antippen = Duftquelle setzen, ziehen = verschieben, zwei Finger = zoomen, doppelt = Gesamtansicht.
 // Finger über Touch Events (auf dem iPhone zuverlässiger für zwei Finger, und preventDefault hält
 // Safaris eigenes Seiten-Zoomen ab), die Maus am Computer über Pointer Events.

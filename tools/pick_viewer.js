@@ -24,6 +24,7 @@ const base = cfg.cols[0].data;
 const outJson = {
   ...base, members: res.map((r) => ({ id: r.id, parents: null, net: r.net, from: r.from })),
   viewer: { picked: res.map((r) => ({ from: r.from, id: r.id, score: +r.score.toFixed(1), oben: r.per })) },
+  viewerInfo: process.env.VIEWER_INFO || null,
 };
 fs.writeFileSync(out, JSON.stringify(outJson));
 for (const r of res) console.log(`${r.from.replace(/.*\//, "")} #${r.id}: Fitness ${r.score.toFixed(1)}, oben bei 0°/10°/20°: ${r.per[0]}/${r.per[10]}/${r.per[20]} von 3`);

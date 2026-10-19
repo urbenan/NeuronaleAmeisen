@@ -29,6 +29,8 @@ und dabei dem Duft zu folgen – direkt im Browser, ohne Server.
 - **Kolonie trainieren (Kommandozeile):** `node tools/train.js <Startwert> <Bewertungen> trained/kolonie-sN.json`,
   dann `node tools/pick_viewer.js 16 trained/kolonie.json trained/kolonie-s*.json` – wählt die besten Ameisen für
   den Viewer; `build_web.py` baut `trained/kolonie.json` in `web/viewer.html` ein
+- **Nachahmungslernen:** `node tools/imitate.js --seed 11 --stride 0.2 --lift 0.15 --steer 0.8 --size 1 --out trained/individuen/ind11.json`
+  – Netz lernt den Dreifuss-Gang per Backpropagation (DAgger); `pick_viewer.js` stellt daraus die Viewer-Kolonie zusammen
 - **Tests:** `for t in test/test_*.js; do node $t; done` (Physik, Duft, Netz, Lernen, Kolonie; ca. 1–2 Minuten)
 
 Der Lernstand wird automatisch im Browser gesichert; mit «Speichern (.json)» / «Laden (.json)» lässt er
@@ -45,6 +47,7 @@ sich als Datei sichern und auf einem anderen Gerät weiterführen.
 | `src/nn.js` | 3-Schicht-Netz, Mutation, Speichern |
 | `src/brain.js` | Sensoren → Netz → Gelenke (60 Hz, träge Muskeln) |
 | `src/evolution.js` | Episoden, Fitness, (1+λ)-ES, Curriculum, Lernstand |
+| `src/imitate.js` | Nachahmungslernen: Lehrer (Dreifuss-Gang), DAgger, Backpropagation mit Adam |
 | `src/ga.js` | Kolonie: Elite, Turnier, Kreuzung ganzer Neuronen, Mutation, Speichern |
 | `src/render.js`, `netview.js`, `learnview.js`, `main.js` | Zeichnen und Bedienung |
 | `PLAN.md` | Plan und Erkenntnisse |
