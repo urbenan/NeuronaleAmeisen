@@ -9,6 +9,19 @@ und dabei dem Duft zu folgen – direkt im Browser, ohne Server.
 - Lernen wahlweise als **Kolonie** (24 Ameisen, je eigenes Netz, genetischer Algorithmus mit Kreuzung ganzer
   Neuronen) oder als **eine Ameise** ((1+λ)-Evolutionsstrategie); Curriculum von flach bis 20°, 3 Startrichtungen
 
+## Seiten
+
+- **[Ameisen lernen](https://urbenan.github.io/NeuronaleAmeisen/web/)** – Physik, Netz-Visualisierung und Lernen im Browser
+- **[Ameisen-Viewer](https://urbenan.github.io/NeuronaleAmeisen/web/viewer.html)** – trainierte Ameisen im Vollbild,
+  die Neigung kommt vom Lagesensor (iPhone schräg halten)
+
+### Viewer auf dem iPhone
+
+1. Link oben in **Safari** öffnen (einmal mit Internet)
+2. Teilen-Symbol → **Zum Home-Bildschirm** – startet dann als Vollbild-App, auch ohne Internet
+3. **Lagesensor einschalten** antippen und «Bewegung & Ausrichtung» erlauben
+4. **Nullpunkt**: die aktuelle Haltung gilt als flach · **Antippen** versetzt die Duftquelle
+
 ## Benutzen
 
 - **Entwickeln:** `index.html` im Browser öffnen (lädt die Skripte aus `src/` einzeln)
