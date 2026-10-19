@@ -1,5 +1,5 @@
 // Service Worker: alle Dateien beim ersten Besuch speichern, danach offline aus dem Cache
-const CACHE = "ameisen-4f6c93eda1";
+const CACHE = "ameisen-36e10bcbeb";
 const FILES = ["./", "index.html", "viewer.html", "manifest.webmanifest", "manifest-viewer.webmanifest", "icon-180.png", "icon-512.png"];
 self.addEventListener("install", (e) => { e.waitUntil(caches.open(CACHE).then((c) => c.addAll(FILES))); self.skipWaiting(); });
 self.addEventListener("activate", (e) => {

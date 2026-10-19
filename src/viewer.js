@@ -6,6 +6,7 @@
 
 // Beim Bündeln (build_web.py) wird hier eine trainierte Kolonie eingesetzt
 const EMBEDDED_ANTS = /*__TRAINED__*/null;
+const BUILD = "__BUILD__";     // build_web.py setzt hier die Version ein (zum Prüfen, ob die neue Version läuft)
 
 const MAIN_STORE = "neuronale-ameisen-lernstand";    // Lernstand der Hauptseite (gleiche Adresse)
 const VIEWER_STORE = "neuronale-ameisen-viewer";     // im Viewer geladene Datei
@@ -184,32 +185,33 @@ $("help").onclick = () => message(
   `• <b>Nullpunkt</b>: so wie du das iPhone gerade hältst, gilt als flach.<br>` +
   `• <b>Antippen</b>: Duftquelle dorthin setzen.<br>` +
   `• <b>Zwei Finger</b>: zoomen · <b>ziehen</b>: verschieben · <b>doppelt tippen</b>: ganze Fläche.<br>` +
-  `• Gelernt wurde bis etwa 20° – steiler rutschen sie ab.<br><br>${sourceName}`);
-// Gesten: Antippen = Duftquelle setzen, ziehen = verschieben, zwei Finger = zoomen, doppelt = Gesamtansicht
-const pointers = new Map();
+  `• Gelernt wurde bis etwa 20° – steiler rutschen sie ab.<br><br>${sourceName}<br><span style="color:var(--muted)">Version ${BUILD}</span>`);
+// Gesten: Antippen = Duftquelle setzen, ziehen = verschieben, zwei Finger = zoomen, doppelt = Gesamtansicht.
+// Finger über Touch Events (auf dem iPhone zuverlässiger für zwei Finger, und preventDefault hält
+// Safaris eigenes Seiten-Zoomen ab), die Maus am Computer über Pointer Events.
+const pointers = new Map();      // aktive Finger/Maus: id -> [x, y] im Canvas
 let gesture = null, lastTap = 0;
 function localXY(e) { const b = cv.getBoundingClientRect(); return [e.clientX - b.left, e.clientY - b.top]; }
-function startGesture() {
+function center() {
   const pts = [...pointers.values()];
-  const mx = pts.reduce((a, p) => a + p[0], 0) / pts.length, my = pts.reduce((a, p) => a + p[1], 0) / pts.length;
-  const dist = pts.length > 1 ? Math.hypot(pts[0][0] - pts[1][0], pts[0][1] - pts[1][1]) : 0;
-  gesture = { n: pts.length, mx, my, dist, zoom: cam.zoom, anchor: toWorldXY(mx, my), moved: gesture ? gesture.moved : 0, multi: (gesture && gesture.multi) || pts.length > 1 };
+  return [pts.reduce((a, p) => a + p[0], 0) / pts.length, pts.reduce((a, p) => a + p[1], 0) / pts.length];
 }
-cv.addEventListener("pointerdown", (e) => {
-  showBar();
-  cv.setPointerCapture(e.pointerId);
-  pointers.set(e.pointerId, localXY(e));
-  if (pointers.size === 1) gesture = null;
-  startGesture();
-});
-cv.addEventListener("pointermove", (e) => {
-  if (!pointers.has(e.pointerId) || !gesture) return;
-  pointers.set(e.pointerId, localXY(e));
+function spread() {
   const pts = [...pointers.values()];
-  const mx = pts.reduce((a, p) => a + p[0], 0) / pts.length, my = pts.reduce((a, p) => a + p[1], 0) / pts.length;
+  return pts.length > 1 ? Math.hypot(pts[0][0] - pts[1][0], pts[0][1] - pts[1][1]) : 0;
+}
+// Beginn oder Wechsel der Fingerzahl: Ausgangslage merken (Weltpunkt unter der Fingermitte)
+function startGesture(fresh) {
+  const [mx, my] = center();
+  gesture = { mx, my, dist: spread(), zoom: cam.zoom, anchor: toWorldXY(mx, my),
+    moved: fresh || !gesture ? 0 : gesture.moved, multi: (!fresh && gesture && gesture.multi) || pointers.size > 1 };
+}
+function moveGesture() {
+  if (!gesture || !pointers.size) return;
+  const [mx, my] = center();
   gesture.moved = Math.max(gesture.moved, Math.hypot(mx - gesture.mx, my - gesture.my));
-  if (pts.length > 1 && gesture.dist > 0) {
-    cam.zoom = gesture.zoom * Math.hypot(pts[0][0] - pts[1][0], pts[0][1] - pts[1][1]) / gesture.dist;
+  if (pointers.size > 1 && gesture.dist > 0) {
+    cam.zoom = gesture.zoom * spread() / gesture.dist;
     gesture.moved = Math.max(gesture.moved, 99);
   }
   if (gesture.moved < 8) return;
@@ -218,13 +220,11 @@ cv.addEventListener("pointermove", (e) => {
   cam.cx = gesture.anchor[0] - (mx - field.w / 2) / camScale();
   cam.cy = gesture.anchor[1] + (my - field.h / 2) / camScale();
   clampCam();
-});
-function endPointer(e) {
-  if (!pointers.has(e.pointerId)) return;
-  const [px, py] = pointers.get(e.pointerId);
-  pointers.delete(e.pointerId);
-  if (pointers.size > 0) { startGesture(); return; }          // ein Finger bleibt: weiter verschieben
-  const tap = gesture && !gesture.multi && gesture.moved < 8 && e.type === "pointerup";
+}
+// letzter Finger weg: war es ein Tippen? (px, py = wo er losgelassen wurde)
+function endGesture(px, py, isUp) {
+  if (pointers.size > 0) { startGesture(false); return; }     // ein Finger bleibt: weiter verschieben
+  const tap = gesture && !gesture.multi && gesture.moved < 8 && isUp;
   gesture = null;
   if (!tap) return;
   const now = performance.now();
@@ -233,8 +233,52 @@ function endPointer(e) {
   [world.scent.x, world.scent.y] = toWorldXY(px, py);
   world.scent.placed = true;
 }
-cv.addEventListener("pointerup", endPointer);
-cv.addEventListener("pointercancel", endPointer);
+
+// Finger (iPhone)
+function setTouches(list) {
+  pointers.clear();
+  for (const t of list) pointers.set(t.identifier, localXY(t));
+}
+cv.addEventListener("touchstart", (e) => {
+  e.preventDefault();
+  showBar();
+  const fresh = pointers.size === 0;
+  setTouches(e.touches);
+  startGesture(fresh);
+}, { passive: false });
+cv.addEventListener("touchmove", (e) => {
+  e.preventDefault();
+  setTouches(e.touches);
+  moveGesture();
+}, { passive: false });
+function touchEnd(e) {
+  e.preventDefault();
+  const [px, py] = localXY(e.changedTouches[0]);
+  setTouches(e.touches);
+  endGesture(px, py, e.type === "touchend");
+}
+cv.addEventListener("touchend", touchEnd, { passive: false });
+cv.addEventListener("touchcancel", touchEnd, { passive: false });
+
+// Maus (Computer)
+cv.addEventListener("pointerdown", (e) => {
+  if (e.pointerType !== "mouse") return;
+  showBar();
+  cv.setPointerCapture(e.pointerId);
+  pointers.set(e.pointerId, localXY(e));
+  startGesture(true);
+});
+cv.addEventListener("pointermove", (e) => {
+  if (e.pointerType !== "mouse" || !pointers.has(e.pointerId)) return;
+  pointers.set(e.pointerId, localXY(e));
+  moveGesture();
+});
+for (const type of ["pointerup", "pointercancel"]) cv.addEventListener(type, (e) => {
+  if (e.pointerType !== "mouse" || !pointers.has(e.pointerId)) return;
+  const [px, py] = localXY(e);
+  pointers.delete(e.pointerId);
+  endGesture(px, py, type === "pointerup");
+});
 // Mausrad (Computer): zoomen um den Mauszeiger
 cv.addEventListener("wheel", (e) => {
   e.preventDefault();
@@ -244,8 +288,8 @@ cv.addEventListener("wheel", (e) => {
   cam.cx = wx - (px - field.w / 2) / camScale(); cam.cy = wy + (py - field.h / 2) / camScale();
   clampCam();
 }, { passive: false });
-// iPhone-Safari: eigene Seiten-Zoomgeste unterdrücken
-document.addEventListener("gesturestart", (e) => e.preventDefault());
+// iPhone-Safari: eigene Seiten-Zoomgeste und Doppeltipp-Zoom unterdrücken
+for (const type of ["gesturestart", "gesturechange", "gestureend"]) document.addEventListener(type, (e) => e.preventDefault(), { passive: false });
 window.addEventListener("resize", layout);
 
 // ---------- Zeichnen ----------

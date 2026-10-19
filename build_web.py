@@ -138,6 +138,11 @@ def main():
     viewer, nv = build_page("viewer.html", "viewer.html",
                             head_extra("Ameisen-Viewer", "manifest-viewer.webmanifest", "black-translucent"),
                             embed=trained or "null")
+    # Version (gleich wie der Cache-Name im Service Worker) in den Viewer schreiben
+    version = hashlib.sha1((page + viewer).encode()).hexdigest()[:10]
+    viewer = viewer.replace('"__BUILD__"', f'"{version}"', 1)
+    with open(os.path.join(WEB, "viewer.html"), "w", encoding="utf-8") as f:
+        f.write(viewer)
 
     for size in (180, 512):
         with open(os.path.join(WEB, f"icon-{size}.png"), "wb") as f:
@@ -146,7 +151,6 @@ def main():
                      ("manifest-viewer.webmanifest", manifest("Ameisen-Viewer", "Ameisen-Viewer", "viewer.html"))):
         with open(os.path.join(WEB, fname), "w", encoding="utf-8") as f:
             json.dump(m, f, ensure_ascii=False, indent=2)
-    version = hashlib.sha1((page + viewer).encode()).hexdigest()[:10]
     sw = f"""// Service Worker: alle Dateien beim ersten Besuch speichern, danach offline aus dem Cache
 const CACHE = "ameisen-{version}";
 const FILES = ["./", "index.html", "viewer.html", "manifest.webmanifest", "manifest-viewer.webmanifest", "icon-180.png", "icon-512.png"];
