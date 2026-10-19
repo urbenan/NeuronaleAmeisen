@@ -151,16 +151,31 @@ def main():
                      ("manifest-viewer.webmanifest", manifest("Ameisen-Viewer", "Ameisen-Viewer", "viewer.html"))):
         with open(os.path.join(WEB, fname), "w", encoding="utf-8") as f:
             json.dump(m, f, ensure_ascii=False, indent=2)
-    sw = f"""// Service Worker: alle Dateien beim ersten Besuch speichern, danach offline aus dem Cache
+    sw = f"""// Service Worker: Offline-Betrieb ("Zum Home-Bildschirm").
+// Seiten (HTML) zuerst aus dem Netz – so kommt jede neue Version sofort an –, ohne Netz aus dem Cache.
+// Übrige Dateien (Icons, Manifeste) aus dem Cache. Beim Installieren alles frisch vom Server holen
+// (cache: "reload"), sonst landet eine noch im Browser zwischengespeicherte alte Version im neuen Cache.
 const CACHE = "ameisen-{version}";
 const FILES = ["./", "index.html", "viewer.html", "manifest.webmanifest", "manifest-viewer.webmanifest", "icon-180.png", "icon-512.png"];
-self.addEventListener("install", (e) => {{ e.waitUntil(caches.open(CACHE).then((c) => c.addAll(FILES))); self.skipWaiting(); }});
+self.addEventListener("install", (e) => {{
+  e.waitUntil(caches.open(CACHE).then((c) => c.addAll(FILES.map((f) => new Request(f, {{ cache: "reload" }})))));
+  self.skipWaiting();
+}});
 self.addEventListener("activate", (e) => {{
   e.waitUntil(caches.keys().then((ks) => Promise.all(ks.filter((k) => k !== CACHE).map((k) => caches.delete(k)))));
   self.clients.claim();
 }});
 self.addEventListener("fetch", (e) => {{
-  e.respondWith(caches.match(e.request, {{ ignoreSearch: true }}).then((r) => r || fetch(e.request)));
+  const req = e.request;
+  const isPage = req.mode === "navigate" || req.url.endsWith(".html") || req.url.endsWith("/");
+  if (isPage) {{
+    e.respondWith(fetch(req, {{ cache: "no-store" }}).then((r) => {{
+      if (r.ok) {{ const copy = r.clone(); caches.open(CACHE).then((c) => c.put(req, copy)); }}
+      return r;
+    }}).catch(() => caches.match(req, {{ ignoreSearch: true }})));
+  }} else {{
+    e.respondWith(caches.match(req, {{ ignoreSearch: true }}).then((r) => r || fetch(req)));
+  }}
 }});
 """
     with open(os.path.join(WEB, "sw.js"), "w", encoding="utf-8") as f:
