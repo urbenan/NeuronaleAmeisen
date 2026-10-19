@@ -26,6 +26,9 @@ und dabei dem Duft zu folgen – direkt im Browser, ohne Server.
 
 - **Entwickeln:** `index.html` im Browser öffnen (lädt die Skripte aus `src/` einzeln)
 - **Eine Datei / offline:** `python3 build_web.py` erzeugt `web/` (alles eingebettet, Manifest, Service Worker, Icons)
+- **Kolonie trainieren (Kommandozeile):** `node tools/train.js <Startwert> <Bewertungen> trained/kolonie-sN.json`,
+  dann `node tools/pick_viewer.js 16 trained/kolonie.json trained/kolonie-s*.json` – wählt die besten Ameisen für
+  den Viewer; `build_web.py` baut `trained/kolonie.json` in `web/viewer.html` ein
 - **Tests:** `for t in test/test_*.js; do node $t; done` (Physik, Duft, Netz, Lernen, Kolonie; ca. 1–2 Minuten)
 
 Der Lernstand wird automatisch im Browser gesichert; mit «Speichern (.json)» / «Laden (.json)» lässt er
