@@ -1,0 +1,21 @@
+Ich möchte Virtuelle Ammeisen erstellen. 
+Jedes von Ihnen bekommt ein eigenes Neuronales Netz. 
+Das Netz sollte ein einfaches 3 Schichtiges sein und 
+Ich wie beim Ziffern Projekt die Netze auch visualisieren können 
+(Gewichte, Topologie)
+ 
+Die Ammeisen sollen einfach modelliert sein aber Body 3 Teilig und 6 Beine
+Haben und 2 Fühler. Beine sollten auch 2 Teilig sein. Wobei sie von oben als ganzes gedreht 
+werden könne am Körper. Aber auch in Z richtung nach oben (Was nicht visulisiert wird)
+Aber für das lernen von Bewegung wichtig ist. im zwischen gelenke auch Z richtung.)
+Es soll ein einfaches Physikalisches Modell gemacht werden am ende der Beine sollte wenn am Boden berührt eine Reibung entstehen die es vorwärts bringen kann.
+(Berechnen Mit winkel der Gelenke und Massenpunkte körper)
+
+Am Anfang mal nur eine Ameise erstellen mit einem Netz. Es soll eine schiefe ebene Heraufgehen. es soll auch der Duftgradient folgen damit es lernt nach oben. 
+Je schneller (besser) es oben ankommt desto mehr werden die Neuronen gewichtet.
+  
+
+Das ganze muss im Browser laufen 2D. (Am Anfang)
+
+
+Bitte Plan

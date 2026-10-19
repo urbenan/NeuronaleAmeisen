@@ -1,0 +1,32 @@
+# Neuronale Ameisen
+
+Eine virtuelle Ameise mit eigenem neuronalem Netz lernt per **Neuroevolution**, einen Hang hinaufzulaufen
+und dabei dem Duft zu folgen – direkt im Browser, ohne Server.
+
+- Körper aus 3 Massenpunkten, 6 zweiteilige Beine mit je 3 Gelenken (α drehen, β heben, γ Knie), 2 Fühler
+- Physik: Reibung an den Füssen mit Bodenkontakt (Haften/Gleiten, elastische Beine), Hangabtrieb
+- Netz 28 → 16 → 18 (tanh), wie beim Ziffern-Projekt sichtbar: Topologie, Gewichte, Live-Aktivierungen
+- Lernen: (1+λ)-Evolutionsstrategie, Curriculum von flach bis 20°, 3 Startrichtungen
+
+## Benutzen
+
+- **Entwickeln:** `index.html` im Browser öffnen (lädt die Skripte aus `src/` einzeln)
+- **Eine Datei / offline:** `python3 build_web.py` erzeugt `web/` (alles eingebettet, Manifest, Service Worker, Icons)
+- **Tests:** `for t in test/test_*.js; do node $t; done` (Physik, Duft, Netz, Lernen; ca. 1 Minute)
+
+Der Lernstand wird automatisch im Browser gesichert; mit «Speichern (.json)» / «Laden (.json)» lässt er
+sich als Datei sichern und auf einem anderen Gerät weiterführen.
+
+## Dateien
+
+| Datei | Inhalt |
+|---|---|
+| `src/ant.js` | Geometrie, Gelenke, Vorwärts- und inverse Kinematik, Fühler |
+| `src/physics.js` | Körper, Bodenkontakt, Reibung (implizit gelöst), Hang |
+| `src/gait.js` | fest programmierter Dreifuss-Gang zum Testen |
+| `src/scent.js` | Duftfeld, Fühler-Sensoren, Test-Lenkung |
+| `src/nn.js` | 3-Schicht-Netz, Mutation, Speichern |
+| `src/brain.js` | Sensoren → Netz → Gelenke (60 Hz, träge Muskeln) |
+| `src/evolution.js` | Episoden, Fitness, (1+λ)-ES, Curriculum, Lernstand |
+| `src/render.js`, `netview.js`, `learnview.js`, `main.js` | Zeichnen und Bedienung |
+| `PLAN.md` | Plan und Erkenntnisse |

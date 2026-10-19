@@ -1,0 +1,322 @@
+<!doctype html>
+<html lang="de">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Neuronale Ameisen</title>
+<style>
+/* Farben und Bedienelemente wie beim Ziffern-Projekt (NeuronalesNetzZiffern/web_lernen). */
+:root {
+  --bg: #eef1f4;
+  --surface: #ffffff;
+  --ink: #1b2733;
+  --muted: #5b6875;
+  --line: #d4dbe2;
+  --accent: #1f4e79;
+  --head: #ddebf7;
+  --ground-lo: #f3ecd9;
+  --ground-hi: #d9c9a0;
+  --grid: rgba(90, 70, 30, 0.12);
+  --grid-major: rgba(90, 70, 30, 0.32);
+  --goal: #1d7a3a;
+  --trail: rgba(31, 78, 121, 0.45);
+  --ant-body: #3b2417;
+  --ant-edge: #1e110a;
+  --ant-leg: #4a2e1d;
+  --stance: #1f4e79;
+  --swing: #8a6d55;
+  --slip: #d23b2f;
+  --force: #c0571b;
+  --scent-rgb: 142, 68, 173;
+  --neg: #f8696b;
+  --mid: #ffffff;
+  --pos: #5a8ac6;
+  --font-ui: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+  --font-num: ui-monospace, "SF Mono", Menlo, Consolas, "Liberation Mono", monospace;
+  --font-display: ui-rounded, "SF Pro Rounded", -apple-system, "Segoe UI", Roboto, Arial, sans-serif;
+}
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    --bg: #10161c; --surface: #18212a; --ink: #e2e8ee; --muted: #94a2b0; --line: #2b3742;
+    --accent: #8dbbe8; --head: #1f3346; --ground-lo: #2a261d; --ground-hi: #4a4029;
+    --grid: rgba(240, 220, 170, 0.08); --grid-major: rgba(240, 220, 170, 0.25); --goal: #6fd08c;
+    --trail: rgba(141, 187, 232, 0.5); --ant-body: #1a0f09; --ant-edge: #c9a585; --ant-leg: #d8b898;
+    --stance: #8dbbe8; --swing: #b89a80; --slip: #ff7a6e; --force: #ffa060; --scent-rgb: 205, 150, 240; --mid: #e9edf1; color-scheme: dark;
+  }
+}
+:root[data-theme="dark"] {
+  --bg: #10161c; --surface: #18212a; --ink: #e2e8ee; --muted: #94a2b0; --line: #2b3742;
+  --accent: #8dbbe8; --head: #1f3346; --ground-lo: #2a261d; --ground-hi: #4a4029;
+  --grid: rgba(240, 220, 170, 0.08); --grid-major: rgba(240, 220, 170, 0.25); --goal: #6fd08c;
+  --trail: rgba(141, 187, 232, 0.5); --ant-body: #1a0f09; --ant-edge: #c9a585; --ant-leg: #d8b898;
+  --stance: #8dbbe8; --swing: #b89a80; --slip: #ff7a6e; --force: #ffa060; --scent-rgb: 205, 150, 240; --mid: #e9edf1; color-scheme: dark;
+}
+* { box-sizing: border-box; }
+html, body { background: var(--bg); color: var(--ink); }
+body {
+  font-family: var(--font-ui); font-size: 15px; line-height: 1.45; margin: 0;
+  padding-left: max(16px, env(safe-area-inset-left, 0px));
+  padding-right: max(16px, env(safe-area-inset-right, 0px));
+  padding-block: 18px 32px;
+  -webkit-text-size-adjust: 100%;
+}
+.wrap { max-width: 1240px; margin: 0 auto; display: grid; gap: 16px; }
+header { display: flex; flex-wrap: wrap; align-items: baseline; gap: 4px 14px; }
+h1 { font-family: var(--font-display); font-size: 1.55rem; margin: 0; letter-spacing: -0.01em; }
+.sub { color: var(--muted); margin: 0; font-size: 0.92rem; }
+.small { font-size: 0.82rem; color: var(--muted); margin: 0; }
+.panel { background: var(--surface); border: 1px solid var(--line); border-radius: 10px; padding: 14px; min-width: 0; display: grid; gap: 12px; align-content: start; }
+.panel h2 { margin: 0; font-size: 0.78rem; text-transform: uppercase; letter-spacing: 0.08em; color: var(--muted); font-weight: 600; }
+
+.controls { display: flex; flex-wrap: wrap; gap: 10px 18px; align-items: center; }
+.group { display: flex; flex-wrap: wrap; gap: 6px; align-items: center; }
+.group > .lab { font-size: 0.78rem; color: var(--muted); }
+button, .seg label { font: inherit; font-size: 0.92rem; border-radius: 8px; border: 1px solid var(--line); background: var(--surface); color: var(--ink); padding: 7px 12px; min-height: 38px; cursor: pointer; }
+button:hover { border-color: var(--accent); }
+button.primary { background: var(--accent); color: var(--surface); border-color: var(--accent); min-width: 7em; font-weight: 600; }
+button:focus-visible, input:focus-visible, .seg input:focus-visible + label { outline: 2px solid var(--accent); outline-offset: 2px; }
+.seg { display: inline-flex; border: 1px solid var(--line); border-radius: 8px; overflow: hidden; }
+.seg input { position: absolute; opacity: 0; pointer-events: none; }
+.seg label { border: 0; border-radius: 0; padding: 7px 11px; font-variant-numeric: tabular-nums; }
+.seg input:checked + label { background: var(--head); color: var(--accent); font-weight: 600; }
+
+.sliders { display: grid; grid-template-columns: repeat(auto-fill, minmax(190px, 1fr)); gap: 8px 18px; }
+.slider { display: grid; grid-template-columns: 1fr auto; gap: 0 8px; font-size: 0.82rem; color: var(--muted); }
+.slider output { font-family: var(--font-num); color: var(--ink); font-variant-numeric: tabular-nums; }
+.slider input { grid-column: 1 / -1; width: 100%; accent-color: var(--accent); }
+.slider.off { opacity: 0.45; }
+.check { display: inline-flex; gap: 6px; align-items: center; font-size: 0.88rem; }
+.check input { accent-color: var(--accent); width: 18px; height: 18px; }
+
+.main { display: grid; grid-template-columns: minmax(0, 1fr) 340px; gap: 16px; }
+@media (max-width: 860px) { .main { grid-template-columns: 1fr; } }
+#world { width: 100%; height: min(70vh, 620px); display: block; border-radius: 8px; touch-action: none; }
+#gait { width: 100%; height: 120px; display: block; }
+
+.stats { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 8px; }
+.stat { border: 1px solid var(--line); border-radius: 8px; padding: 8px 10px; }
+.stat .k { font-size: 0.75rem; color: var(--muted); }
+.stat .v { font-family: var(--font-num); font-size: 1.1rem; font-variant-numeric: tabular-nums; }
+.stat.win { background: #c6efce; border-color: #8ccf9a; color: #1d5e2c; }
+.stat.win .k { color: #1d5e2c; }
+.sense { display: grid; grid-template-columns: auto 1fr 4.2em; gap: 6px 10px; align-items: center; font-size: 0.82rem; }
+.sense .lab { color: var(--muted); }
+.sense output { font-family: var(--font-num); text-align: right; font-variant-numeric: tabular-nums; }
+.bar { position: relative; height: 12px; border-radius: 6px; background: var(--bg); border: 1px solid var(--line); overflow: hidden; }
+.bar i { position: absolute; top: 0; bottom: 0; left: 0; width: 0; background: rgb(var(--scent-rgb)); }
+.bar.mid::after { content: ""; position: absolute; left: 50%; top: 0; bottom: 0; width: 1px; background: var(--muted); }
+.learngrid { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); gap: 18px; }
+@media (max-width: 860px) { .learngrid { grid-template-columns: 1fr; } }
+#curve { width: 100%; height: 260px; display: block; }
+.stats4 { grid-template-columns: repeat(4, minmax(0, 1fr)); }
+@media (max-width: 560px) { .stats4 { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
+.netgrid { display: grid; grid-template-columns: minmax(0, 3fr) minmax(0, 2fr); gap: 18px; }
+@media (max-width: 860px) { .learngrid { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); gap: 18px; }
+@media (max-width: 860px) { .learngrid { grid-template-columns: 1fr; } }
+#curve { width: 100%; height: 260px; display: block; }
+.stats4 { grid-template-columns: repeat(4, minmax(0, 1fr)); }
+@media (max-width: 560px) { .stats4 { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
+.netgrid { grid-template-columns: 1fr; } }
+.netbox { display: grid; gap: 8px; align-content: start; min-width: 0; }
+.netbox h3 { margin: 4px 0 0; font-size: 0.8rem; font-weight: 600; color: var(--muted); display: flex; justify-content: space-between; }
+.netbox h3 span { font-weight: 400; font-family: var(--font-num); }
+#net, #w1, #w2 { width: 100%; display: block; touch-action: manipulation; }
+.legend .scale { display: inline-block; width: 90px; height: 10px; border-radius: 2px; border: 1px solid var(--line); background: linear-gradient(90deg, var(--neg), var(--mid), var(--pos)); vertical-align: -1px; }
+.panel h2 span { text-transform: none; letter-spacing: 0; font-weight: 400; }
+.legend { display: flex; flex-wrap: wrap; gap: 4px 12px; font-size: 0.78rem; color: var(--muted); }
+.dot { display: inline-block; width: 10px; height: 10px; border-radius: 50%; vertical-align: -1px; margin-right: 4px; }
+
+.joints { display: grid; grid-template-columns: 34px repeat(3, minmax(0, 1fr)); gap: 6px 14px; align-items: center; }
+.joints .hd { font-size: 0.75rem; color: var(--muted); }
+.joints .leg { font-family: var(--font-num); font-size: 0.85rem; font-weight: 600; }
+.joint { display: grid; grid-template-columns: 1fr 3.4em; gap: 6px; align-items: center; }
+.joint input { width: 100%; accent-color: var(--accent); }
+.joint output { font-family: var(--font-num); font-size: 0.8rem; text-align: right; font-variant-numeric: tabular-nums; }
+@media (max-width: 560px) { .joints { grid-template-columns: 28px repeat(3, minmax(0, 1fr)); gap: 6px 8px; } .joint { grid-template-columns: 1fr; } .joint output { text-align: left; } }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <header>
+    <h1>Neuronale Ameisen</h1>
+    <p class="sub">Schritt 5 – den Hang hinauf: Die Ameise lernt erst flach, dann immer steiler (Curriculum), und muss aus verschiedenen Richtungen dem Duft nach oben folgen.</p>
+  </header>
+
+  <section class="panel">
+    <div class="controls">
+      <div class="group">
+        <button id="run" class="primary">Pause</button>
+        <button id="reset">Zurücksetzen</button>
+      </div>
+      <div class="group">
+        <span class="lab">Steuerung</span>
+        <div class="seg" role="radiogroup">
+          <input type="radio" name="mode" id="m-gait" value="gait" checked><label for="m-gait">Dreifuss-Gang</label>
+          <input type="radio" name="mode" id="m-net" value="net"><label for="m-net">Netz</label>
+          <input type="radio" name="mode" id="m-hand" value="hand"><label for="m-hand">Handsteuerung</label>
+        </div>
+      </div>
+      <div class="group">
+        <span class="lab">Tempo</span>
+        <div class="seg" role="radiogroup">
+          <input type="radio" name="speed" id="s01" value="0.1"><label for="s01">0.1×</label>
+          <input type="radio" name="speed" id="s025" value="0.25"><label for="s025">¼×</label>
+          <input type="radio" name="speed" id="s1" value="1" checked><label for="s1">1×</label>
+          <input type="radio" name="speed" id="s4" value="4"><label for="s4">4×</label>
+        </div>
+      </div>
+      <label class="check"><input type="checkbox" id="follow" checked> Duft folgen (Test-Lenkung)</label>
+      <label class="check"><input type="checkbox" id="stop-goal" checked> am Ziel anhalten</label>
+      <label class="check"><input type="checkbox" id="forces" checked> Reibungskräfte zeigen</label>
+    </div>
+    <div class="sliders" id="sliders"></div>
+  </section>
+
+  <section class="panel">
+    <h2>Lernen <span id="lr-title"></span></h2>
+    <div class="learngrid">
+      <div class="netbox">
+        <div class="controls">
+          <div class="group">
+            <button id="learn" class="primary">Lernen starten</button>
+            <button id="learn-reset">Neu beginnen</button>
+          </div>
+          <div class="group">
+            <button id="save">Speichern (.json)</button>
+            <button id="load">Laden (.json)</button>
+            <input type="file" id="load-file" accept=".json,application/json" hidden>
+          </div>
+          <div class="group">
+            <span class="lab">Lerntempo</span>
+            <div class="seg" role="radiogroup">
+              <input type="radio" name="tempo" id="t-watch" value="watch"><label for="t-watch">gemütlich</label>
+              <input type="radio" name="tempo" id="t-fast" value="fast" checked><label for="t-fast">schnell</label>
+              <input type="radio" name="tempo" id="t-turbo" value="turbo"><label for="t-turbo">Turbo</label>
+            </div>
+          </div>
+        </div>
+        <div class="controls">
+          <label class="check"><input type="checkbox" id="cur-on" checked> Curriculum: Neigung steigern, sobald oben angekommen</label>
+          <div class="group">
+            <span class="lab">Startrichtungen</span>
+            <div class="seg" role="radiogroup">
+              <input type="radio" name="starts" id="st-1" value="1"><label for="st-1">1 (hangaufwärts)</label>
+              <input type="radio" name="starts" id="st-3" value="3" checked><label for="st-3">3 (dazu ±40°)</label>
+            </div>
+          </div>
+        </div>
+        <div class="sliders" id="learn-sliders"></div>
+        <p class="small" id="lr-store">Der Lernstand wird automatisch in diesem Browser gesichert.</p>
+        <div class="stats stats4">
+          <div class="stat"><div class="k">Generation</div><div class="v" id="lr-gen">0</div></div>
+          <div class="stat"><div class="k">Episoden</div><div class="v" id="lr-eps">0</div></div>
+          <div class="stat"><div class="k">Episoden pro s</div><div class="v" id="lr-rate">–</div></div>
+          <div class="stat" id="lr-slope-box"><div class="k">Neigung</div><div class="v" id="lr-slope">–</div></div>
+          <div class="stat"><div class="k">Bester Weg</div><div class="v" id="lr-weg">–</div></div>
+          <div class="stat"><div class="k">davon rutschend</div><div class="v" id="lr-slip">–</div></div>
+          <div class="stat"><div class="k">σ · Erfolgsquote</div><div class="v" id="lr-sigma">–</div></div>
+          <div class="stat" id="lr-goal-box"><div class="k">Ziel erreicht</div><div class="v" id="lr-goal">–</div></div>
+        </div>
+      </div>
+      <div class="netbox">
+        <canvas id="curve" aria-label="Lernkurve: Fitness über die Episoden"></canvas>
+        <div class="legend"><span><span class="dot" style="background:var(--accent)"></span>Fitness bestes Netz</span><span><span class="dot" style="background:var(--muted);opacity:.5"></span>bester Versuch einer Generation</span><span><span class="dot" style="background:var(--goal)"></span>Neigung (rechte Achse)</span></div>
+        <p class="small">Pro Generation entstehen <b id="lr-lambda">8</b> Varianten des besten Netzes (alle Gewichte um σ zufällig verändert). Jede läuft eine Episode; ist die beste mindestens so gut, wird sie das neue beste Netz. <b>Fitness</b> = Weg zur Duftquelle in cm × (1 − Anteil rutschender Füsse), am Ziel Bonus + 2 pro gesparte Sekunde – je schneller oben, desto besser. Bei 3 Startrichtungen zählt der Mittelwert: Wer schräg startet, muss mit den Fühlern den Weg nach oben finden. <b>Curriculum</b>: Kommt das beste Netz bei allen Starts oben an, wird der Hang um eine Stufe steiler. Direkt am steilen Hang lernt die Ameise nur stillzustehen. Die Welt zeigt immer das aktuell beste Netz, reihum aus allen Startrichtungen.</p>
+      </div>
+    </div>
+  </section>
+
+  <div class="main">
+    <section class="panel">
+      <canvas id="world" aria-label="Ameise auf dem Hang, von oben"></canvas>
+      <div class="legend">
+        <span><span class="dot" style="background:var(--stance)"></span>Fuss am Boden</span>
+        <span><span class="dot" style="background:var(--slip)"></span>Fuss rutscht</span>
+        <span><span class="dot" style="border:1.5px solid var(--swing)"></span>Fuss in der Luft</span>
+        <span><span class="dot" style="background:var(--force)"></span>Reibungskraft auf den Körper</span>
+        <span><span class="dot" style="background:rgb(var(--scent-rgb))"></span>Duft / Fühlerspitze (Sensor)</span>
+        <span>Mausrad / Pinch: Zoom</span>
+      </div>
+    </section>
+    <div style="display:grid; gap:16px; align-content:start">
+      <section class="panel">
+        <h2>Kennzahlen</h2>
+        <div class="stats">
+          <div class="stat"><div class="k">Zeit</div><div class="v" id="st-t">0.0 s</div></div>
+          <div class="stat" id="st-goal-box"><div class="k">Ziel</div><div class="v" id="st-goal">–</div></div>
+          <div class="stat"><div class="k">Strecke hangaufwärts</div><div class="v" id="st-y">0.0 cm</div></div>
+          <div class="stat"><div class="k">Tempo hangaufwärts</div><div class="v" id="st-v">0.0 cm/s</div></div>
+          <div class="stat"><div class="k">Standbeine</div><div class="v" id="st-legs">6</div></div>
+          <div class="stat"><div class="k">Rutschende Füsse</div><div class="v" id="st-slip">0</div></div>
+        </div>
+      </section>
+      <section class="panel">
+        <h2>Fühler (Duftsensoren)</h2>
+        <div class="sense">
+          <span class="lab">links</span><div class="bar"><i id="se-l"></i></div><output id="se-lv">–</output>
+          <span class="lab">rechts</span><div class="bar"><i id="se-r"></i></div><output id="se-rv">–</output>
+          <span class="lab">Richtung</span><div class="bar mid"><i id="se-d"></i></div><output id="se-dv">–</output>
+        </div>
+        <p class="small" id="se-text">–</p>
+      </section>
+      <section class="panel">
+        <h2>Gangbild (letzte 2 s)</h2>
+        <canvas id="gait" aria-label="Gangbild: welcher Fuss wann am Boden ist"></canvas>
+        <p class="small">Beim Dreifuss-Gang wechseln sich L1 R2 L3 und R1 L2 R3 ab.</p>
+      </section>
+    </div>
+  </div>
+
+  <section class="panel">
+    <h2>Netz <span id="net-title"></span></h2>
+    <div class="controls">
+      <div class="group">
+        <button id="net-new">Neues Zufallsnetz (Lernen von vorn)</button>
+        <span class="small" id="net-seed"></span>
+      </div>
+      <div class="group">
+        <span class="lab">Linien</span>
+        <div class="seg" role="radiogroup">
+          <input type="radio" name="lines" id="l-w" value="weights" checked><label for="l-w">Gewichte</label>
+          <input type="radio" name="lines" id="l-f" value="flow"><label for="l-f">Signal (Gewicht × Aktivierung)</label>
+        </div>
+      </div>
+    </div>
+    <div class="netgrid">
+      <div class="netbox">
+        <canvas id="net" aria-label="Netz: Eingänge, verborgene Neuronen, Ausgänge mit Gewichten"></canvas>
+        <div class="legend"><span>negativ</span><span class="scale"></span><span>positiv</span><span>Kreise: aktuelle Aktivierung · Linien: <span id="line-what">Gewichte</span></span></div>
+        <p class="small" id="net-info"></p>
+      </div>
+      <div class="netbox">
+        <h3>W1: Eingang → verborgen <span id="w1max"></span></h3>
+        <canvas id="w1" aria-label="Gewichtsmatrix W1"></canvas>
+        <h3>W2: verborgen → Ausgang <span id="w2max"></span></h3>
+        <canvas id="w2" aria-label="Gewichtsmatrix W2"></canvas>
+        <p class="small">Spalten je Bein: α β γ. Gleiche Farbskala wie die Linien.</p>
+        <p class="small" id="mat-info">Zeige auf eine Kachel, um ihr Gewicht zu sehen.</p>
+      </div>
+    </div>
+    <p class="small">Rechenweg wie beim Ziffern-Projekt: h = tanh(x·W1 + b1), y = tanh(h·W2 + b2). Das Netz rechnet 60-mal pro Sekunde; die Muskeln folgen dem Befehl mit 50 ms Verzögerung. In den anderen Steuerungsarten rechnet das Netz nur mit, steuert aber nicht.</p>
+  </section>
+
+  <section class="panel">
+    <h2>Gelenkwinkel (Grad)</h2>
+    <p class="small">α dreht das Bein von oben gesehen (+ = nach vorne). β hebt den Oberschenkel, γ beugt das Knie – beides in Z-Richtung, von oben nicht direkt sichtbar. In der Handsteuerung kannst du die Sollwerte hier einstellen.</p>
+    <div class="joints" id="joints"></div>
+  </section>
+</div>
+
+<script src="src/ant.js"></script>
+<script src="src/physics.js"></script>
+<script src="src/gait.js"></script>
+<script src="src/scent.js"></script>
+<script src="src/nn.js"></script>
+<script src="src/brain.js"></script>
+<script src="src/render.js"></script>
+<script src="src/netview.js"></script>
+<script src="src/evolution.js"></script>
+<script src="src/learnview.js"></script>
+<script src="src/main.js"></script>
+</body>
+</html>

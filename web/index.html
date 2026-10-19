@@ -1,0 +1,1920 @@
+<!doctype html>
+<html lang="de">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Neuronale Ameisen</title>
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-title" content="Ameisen">
+<meta name="apple-mobile-web-app-status-bar-style" content="default">
+<meta name="theme-color" content="#1f4e79">
+<link rel="manifest" href="manifest.webmanifest">
+<link rel="apple-touch-icon" href="icon-180.png">
+<style>
+/* Farben und Bedienelemente wie beim Ziffern-Projekt (NeuronalesNetzZiffern/web_lernen). */
+:root {
+  --bg: #eef1f4;
+  --surface: #ffffff;
+  --ink: #1b2733;
+  --muted: #5b6875;
+  --line: #d4dbe2;
+  --accent: #1f4e79;
+  --head: #ddebf7;
+  --ground-lo: #f3ecd9;
+  --ground-hi: #d9c9a0;
+  --grid: rgba(90, 70, 30, 0.12);
+  --grid-major: rgba(90, 70, 30, 0.32);
+  --goal: #1d7a3a;
+  --trail: rgba(31, 78, 121, 0.45);
+  --ant-body: #3b2417;
+  --ant-edge: #1e110a;
+  --ant-leg: #4a2e1d;
+  --stance: #1f4e79;
+  --swing: #8a6d55;
+  --slip: #d23b2f;
+  --force: #c0571b;
+  --scent-rgb: 142, 68, 173;
+  --neg: #f8696b;
+  --mid: #ffffff;
+  --pos: #5a8ac6;
+  --font-ui: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+  --font-num: ui-monospace, "SF Mono", Menlo, Consolas, "Liberation Mono", monospace;
+  --font-display: ui-rounded, "SF Pro Rounded", -apple-system, "Segoe UI", Roboto, Arial, sans-serif;
+}
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    --bg: #10161c; --surface: #18212a; --ink: #e2e8ee; --muted: #94a2b0; --line: #2b3742;
+    --accent: #8dbbe8; --head: #1f3346; --ground-lo: #2a261d; --ground-hi: #4a4029;
+    --grid: rgba(240, 220, 170, 0.08); --grid-major: rgba(240, 220, 170, 0.25); --goal: #6fd08c;
+    --trail: rgba(141, 187, 232, 0.5); --ant-body: #1a0f09; --ant-edge: #c9a585; --ant-leg: #d8b898;
+    --stance: #8dbbe8; --swing: #b89a80; --slip: #ff7a6e; --force: #ffa060; --scent-rgb: 205, 150, 240; --mid: #e9edf1; color-scheme: dark;
+  }
+}
+:root[data-theme="dark"] {
+  --bg: #10161c; --surface: #18212a; --ink: #e2e8ee; --muted: #94a2b0; --line: #2b3742;
+  --accent: #8dbbe8; --head: #1f3346; --ground-lo: #2a261d; --ground-hi: #4a4029;
+  --grid: rgba(240, 220, 170, 0.08); --grid-major: rgba(240, 220, 170, 0.25); --goal: #6fd08c;
+  --trail: rgba(141, 187, 232, 0.5); --ant-body: #1a0f09; --ant-edge: #c9a585; --ant-leg: #d8b898;
+  --stance: #8dbbe8; --swing: #b89a80; --slip: #ff7a6e; --force: #ffa060; --scent-rgb: 205, 150, 240; --mid: #e9edf1; color-scheme: dark;
+}
+* { box-sizing: border-box; }
+html, body { background: var(--bg); color: var(--ink); }
+body {
+  font-family: var(--font-ui); font-size: 15px; line-height: 1.45; margin: 0;
+  padding-left: max(16px, env(safe-area-inset-left, 0px));
+  padding-right: max(16px, env(safe-area-inset-right, 0px));
+  padding-block: 18px 32px;
+  -webkit-text-size-adjust: 100%;
+}
+.wrap { max-width: 1240px; margin: 0 auto; display: grid; gap: 16px; }
+header { display: flex; flex-wrap: wrap; align-items: baseline; gap: 4px 14px; }
+h1 { font-family: var(--font-display); font-size: 1.55rem; margin: 0; letter-spacing: -0.01em; }
+.sub { color: var(--muted); margin: 0; font-size: 0.92rem; }
+.small { font-size: 0.82rem; color: var(--muted); margin: 0; }
+.panel { background: var(--surface); border: 1px solid var(--line); border-radius: 10px; padding: 14px; min-width: 0; display: grid; gap: 12px; align-content: start; }
+.panel h2 { margin: 0; font-size: 0.78rem; text-transform: uppercase; letter-spacing: 0.08em; color: var(--muted); font-weight: 600; }
+
+.controls { display: flex; flex-wrap: wrap; gap: 10px 18px; align-items: center; }
+.group { display: flex; flex-wrap: wrap; gap: 6px; align-items: center; }
+.group > .lab { font-size: 0.78rem; color: var(--muted); }
+button, .seg label { font: inherit; font-size: 0.92rem; border-radius: 8px; border: 1px solid var(--line); background: var(--surface); color: var(--ink); padding: 7px 12px; min-height: 38px; cursor: pointer; }
+button:hover { border-color: var(--accent); }
+button.primary { background: var(--accent); color: var(--surface); border-color: var(--accent); min-width: 7em; font-weight: 600; }
+button:focus-visible, input:focus-visible, .seg input:focus-visible + label { outline: 2px solid var(--accent); outline-offset: 2px; }
+.seg { display: inline-flex; border: 1px solid var(--line); border-radius: 8px; overflow: hidden; }
+.seg input { position: absolute; opacity: 0; pointer-events: none; }
+.seg label { border: 0; border-radius: 0; padding: 7px 11px; font-variant-numeric: tabular-nums; }
+.seg input:checked + label { background: var(--head); color: var(--accent); font-weight: 600; }
+
+.sliders { display: grid; grid-template-columns: repeat(auto-fill, minmax(190px, 1fr)); gap: 8px 18px; }
+.slider { display: grid; grid-template-columns: 1fr auto; gap: 0 8px; font-size: 0.82rem; color: var(--muted); }
+.slider output { font-family: var(--font-num); color: var(--ink); font-variant-numeric: tabular-nums; }
+.slider input { grid-column: 1 / -1; width: 100%; accent-color: var(--accent); }
+.slider.off { opacity: 0.45; }
+.check { display: inline-flex; gap: 6px; align-items: center; font-size: 0.88rem; }
+.check input { accent-color: var(--accent); width: 18px; height: 18px; }
+
+.main { display: grid; grid-template-columns: minmax(0, 1fr) 340px; gap: 16px; }
+@media (max-width: 860px) { .main { grid-template-columns: 1fr; } }
+#world { width: 100%; height: min(70vh, 620px); display: block; border-radius: 8px; touch-action: none; }
+#gait { width: 100%; height: 120px; display: block; }
+
+.stats { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 8px; }
+.stat { border: 1px solid var(--line); border-radius: 8px; padding: 8px 10px; }
+.stat .k { font-size: 0.75rem; color: var(--muted); }
+.stat .v { font-family: var(--font-num); font-size: 1.1rem; font-variant-numeric: tabular-nums; }
+.stat.win { background: #c6efce; border-color: #8ccf9a; color: #1d5e2c; }
+.stat.win .k { color: #1d5e2c; }
+.sense { display: grid; grid-template-columns: auto 1fr 4.2em; gap: 6px 10px; align-items: center; font-size: 0.82rem; }
+.sense .lab { color: var(--muted); }
+.sense output { font-family: var(--font-num); text-align: right; font-variant-numeric: tabular-nums; }
+.bar { position: relative; height: 12px; border-radius: 6px; background: var(--bg); border: 1px solid var(--line); overflow: hidden; }
+.bar i { position: absolute; top: 0; bottom: 0; left: 0; width: 0; background: rgb(var(--scent-rgb)); }
+.bar.mid::after { content: ""; position: absolute; left: 50%; top: 0; bottom: 0; width: 1px; background: var(--muted); }
+.learngrid { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); gap: 18px; }
+@media (max-width: 860px) { .learngrid { grid-template-columns: 1fr; } }
+#curve { width: 100%; height: 260px; display: block; }
+.stats4 { grid-template-columns: repeat(4, minmax(0, 1fr)); }
+@media (max-width: 560px) { .stats4 { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
+.netgrid { display: grid; grid-template-columns: minmax(0, 3fr) minmax(0, 2fr); gap: 18px; }
+@media (max-width: 860px) { .learngrid { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); gap: 18px; }
+@media (max-width: 860px) { .learngrid { grid-template-columns: 1fr; } }
+#curve { width: 100%; height: 260px; display: block; }
+.stats4 { grid-template-columns: repeat(4, minmax(0, 1fr)); }
+@media (max-width: 560px) { .stats4 { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
+.netgrid { grid-template-columns: 1fr; } }
+.netbox { display: grid; gap: 8px; align-content: start; min-width: 0; }
+.netbox h3 { margin: 4px 0 0; font-size: 0.8rem; font-weight: 600; color: var(--muted); display: flex; justify-content: space-between; }
+.netbox h3 span { font-weight: 400; font-family: var(--font-num); }
+#net, #w1, #w2 { width: 100%; display: block; touch-action: manipulation; }
+.legend .scale { display: inline-block; width: 90px; height: 10px; border-radius: 2px; border: 1px solid var(--line); background: linear-gradient(90deg, var(--neg), var(--mid), var(--pos)); vertical-align: -1px; }
+.panel h2 span { text-transform: none; letter-spacing: 0; font-weight: 400; }
+.legend { display: flex; flex-wrap: wrap; gap: 4px 12px; font-size: 0.78rem; color: var(--muted); }
+.dot { display: inline-block; width: 10px; height: 10px; border-radius: 50%; vertical-align: -1px; margin-right: 4px; }
+
+.joints { display: grid; grid-template-columns: 34px repeat(3, minmax(0, 1fr)); gap: 6px 14px; align-items: center; }
+.joints .hd { font-size: 0.75rem; color: var(--muted); }
+.joints .leg { font-family: var(--font-num); font-size: 0.85rem; font-weight: 600; }
+.joint { display: grid; grid-template-columns: 1fr 3.4em; gap: 6px; align-items: center; }
+.joint input { width: 100%; accent-color: var(--accent); }
+.joint output { font-family: var(--font-num); font-size: 0.8rem; text-align: right; font-variant-numeric: tabular-nums; }
+@media (max-width: 560px) { .joints { grid-template-columns: 28px repeat(3, minmax(0, 1fr)); gap: 6px 8px; } .joint { grid-template-columns: 1fr; } .joint output { text-align: left; } }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <header>
+    <h1>Neuronale Ameisen</h1>
+    <p class="sub">Schritt 5 – den Hang hinauf: Die Ameise lernt erst flach, dann immer steiler (Curriculum), und muss aus verschiedenen Richtungen dem Duft nach oben folgen.</p>
+  </header>
+
+  <section class="panel">
+    <div class="controls">
+      <div class="group">
+        <button id="run" class="primary">Pause</button>
+        <button id="reset">Zurücksetzen</button>
+      </div>
+      <div class="group">
+        <span class="lab">Steuerung</span>
+        <div class="seg" role="radiogroup">
+          <input type="radio" name="mode" id="m-gait" value="gait" checked><label for="m-gait">Dreifuss-Gang</label>
+          <input type="radio" name="mode" id="m-net" value="net"><label for="m-net">Netz</label>
+          <input type="radio" name="mode" id="m-hand" value="hand"><label for="m-hand">Handsteuerung</label>
+        </div>
+      </div>
+      <div class="group">
+        <span class="lab">Tempo</span>
+        <div class="seg" role="radiogroup">
+          <input type="radio" name="speed" id="s01" value="0.1"><label for="s01">0.1×</label>
+          <input type="radio" name="speed" id="s025" value="0.25"><label for="s025">¼×</label>
+          <input type="radio" name="speed" id="s1" value="1" checked><label for="s1">1×</label>
+          <input type="radio" name="speed" id="s4" value="4"><label for="s4">4×</label>
+        </div>
+      </div>
+      <label class="check"><input type="checkbox" id="follow" checked> Duft folgen (Test-Lenkung)</label>
+      <label class="check"><input type="checkbox" id="stop-goal" checked> am Ziel anhalten</label>
+      <label class="check"><input type="checkbox" id="forces" checked> Reibungskräfte zeigen</label>
+    </div>
+    <div class="sliders" id="sliders"></div>
+  </section>
+
+  <section class="panel">
+    <h2>Lernen <span id="lr-title"></span></h2>
+    <div class="learngrid">
+      <div class="netbox">
+        <div class="controls">
+          <div class="group">
+            <button id="learn" class="primary">Lernen starten</button>
+            <button id="learn-reset">Neu beginnen</button>
+          </div>
+          <div class="group">
+            <button id="save">Speichern (.json)</button>
+            <button id="load">Laden (.json)</button>
+            <input type="file" id="load-file" accept=".json,application/json" hidden>
+          </div>
+          <div class="group">
+            <span class="lab">Lerntempo</span>
+            <div class="seg" role="radiogroup">
+              <input type="radio" name="tempo" id="t-watch" value="watch"><label for="t-watch">gemütlich</label>
+              <input type="radio" name="tempo" id="t-fast" value="fast" checked><label for="t-fast">schnell</label>
+              <input type="radio" name="tempo" id="t-turbo" value="turbo"><label for="t-turbo">Turbo</label>
+            </div>
+          </div>
+        </div>
+        <div class="controls">
+          <label class="check"><input type="checkbox" id="cur-on" checked> Curriculum: Neigung steigern, sobald oben angekommen</label>
+          <div class="group">
+            <span class="lab">Startrichtungen</span>
+            <div class="seg" role="radiogroup">
+              <input type="radio" name="starts" id="st-1" value="1"><label for="st-1">1 (hangaufwärts)</label>
+              <input type="radio" name="starts" id="st-3" value="3" checked><label for="st-3">3 (dazu ±40°)</label>
+            </div>
+          </div>
+        </div>
+        <div class="sliders" id="learn-sliders"></div>
+        <p class="small" id="lr-store">Der Lernstand wird automatisch in diesem Browser gesichert.</p>
+        <div class="stats stats4">
+          <div class="stat"><div class="k">Generation</div><div class="v" id="lr-gen">0</div></div>
+          <div class="stat"><div class="k">Episoden</div><div class="v" id="lr-eps">0</div></div>
+          <div class="stat"><div class="k">Episoden pro s</div><div class="v" id="lr-rate">–</div></div>
+          <div class="stat" id="lr-slope-box"><div class="k">Neigung</div><div class="v" id="lr-slope">–</div></div>
+          <div class="stat"><div class="k">Bester Weg</div><div class="v" id="lr-weg">–</div></div>
+          <div class="stat"><div class="k">davon rutschend</div><div class="v" id="lr-slip">–</div></div>
+          <div class="stat"><div class="k">σ · Erfolgsquote</div><div class="v" id="lr-sigma">–</div></div>
+          <div class="stat" id="lr-goal-box"><div class="k">Ziel erreicht</div><div class="v" id="lr-goal">–</div></div>
+        </div>
+      </div>
+      <div class="netbox">
+        <canvas id="curve" aria-label="Lernkurve: Fitness über die Episoden"></canvas>
+        <div class="legend"><span><span class="dot" style="background:var(--accent)"></span>Fitness bestes Netz</span><span><span class="dot" style="background:var(--muted);opacity:.5"></span>bester Versuch einer Generation</span><span><span class="dot" style="background:var(--goal)"></span>Neigung (rechte Achse)</span></div>
+        <p class="small">Pro Generation entstehen <b id="lr-lambda">8</b> Varianten des besten Netzes (alle Gewichte um σ zufällig verändert). Jede läuft eine Episode; ist die beste mindestens so gut, wird sie das neue beste Netz. <b>Fitness</b> = Weg zur Duftquelle in cm × (1 − Anteil rutschender Füsse), am Ziel Bonus + 2 pro gesparte Sekunde – je schneller oben, desto besser. Bei 3 Startrichtungen zählt der Mittelwert: Wer schräg startet, muss mit den Fühlern den Weg nach oben finden. <b>Curriculum</b>: Kommt das beste Netz bei allen Starts oben an, wird der Hang um eine Stufe steiler. Direkt am steilen Hang lernt die Ameise nur stillzustehen. Die Welt zeigt immer das aktuell beste Netz, reihum aus allen Startrichtungen.</p>
+      </div>
+    </div>
+  </section>
+
+  <div class="main">
+    <section class="panel">
+      <canvas id="world" aria-label="Ameise auf dem Hang, von oben"></canvas>
+      <div class="legend">
+        <span><span class="dot" style="background:var(--stance)"></span>Fuss am Boden</span>
+        <span><span class="dot" style="background:var(--slip)"></span>Fuss rutscht</span>
+        <span><span class="dot" style="border:1.5px solid var(--swing)"></span>Fuss in der Luft</span>
+        <span><span class="dot" style="background:var(--force)"></span>Reibungskraft auf den Körper</span>
+        <span><span class="dot" style="background:rgb(var(--scent-rgb))"></span>Duft / Fühlerspitze (Sensor)</span>
+        <span>Mausrad / Pinch: Zoom</span>
+      </div>
+    </section>
+    <div style="display:grid; gap:16px; align-content:start">
+      <section class="panel">
+        <h2>Kennzahlen</h2>
+        <div class="stats">
+          <div class="stat"><div class="k">Zeit</div><div class="v" id="st-t">0.0 s</div></div>
+          <div class="stat" id="st-goal-box"><div class="k">Ziel</div><div class="v" id="st-goal">–</div></div>
+          <div class="stat"><div class="k">Strecke hangaufwärts</div><div class="v" id="st-y">0.0 cm</div></div>
+          <div class="stat"><div class="k">Tempo hangaufwärts</div><div class="v" id="st-v">0.0 cm/s</div></div>
+          <div class="stat"><div class="k">Standbeine</div><div class="v" id="st-legs">6</div></div>
+          <div class="stat"><div class="k">Rutschende Füsse</div><div class="v" id="st-slip">0</div></div>
+        </div>
+      </section>
+      <section class="panel">
+        <h2>Fühler (Duftsensoren)</h2>
+        <div class="sense">
+          <span class="lab">links</span><div class="bar"><i id="se-l"></i></div><output id="se-lv">–</output>
+          <span class="lab">rechts</span><div class="bar"><i id="se-r"></i></div><output id="se-rv">–</output>
+          <span class="lab">Richtung</span><div class="bar mid"><i id="se-d"></i></div><output id="se-dv">–</output>
+        </div>
+        <p class="small" id="se-text">–</p>
+      </section>
+      <section class="panel">
+        <h2>Gangbild (letzte 2 s)</h2>
+        <canvas id="gait" aria-label="Gangbild: welcher Fuss wann am Boden ist"></canvas>
+        <p class="small">Beim Dreifuss-Gang wechseln sich L1 R2 L3 und R1 L2 R3 ab.</p>
+      </section>
+    </div>
+  </div>
+
+  <section class="panel">
+    <h2>Netz <span id="net-title"></span></h2>
+    <div class="controls">
+      <div class="group">
+        <button id="net-new">Neues Zufallsnetz (Lernen von vorn)</button>
+        <span class="small" id="net-seed"></span>
+      </div>
+      <div class="group">
+        <span class="lab">Linien</span>
+        <div class="seg" role="radiogroup">
+          <input type="radio" name="lines" id="l-w" value="weights" checked><label for="l-w">Gewichte</label>
+          <input type="radio" name="lines" id="l-f" value="flow"><label for="l-f">Signal (Gewicht × Aktivierung)</label>
+        </div>
+      </div>
+    </div>
+    <div class="netgrid">
+      <div class="netbox">
+        <canvas id="net" aria-label="Netz: Eingänge, verborgene Neuronen, Ausgänge mit Gewichten"></canvas>
+        <div class="legend"><span>negativ</span><span class="scale"></span><span>positiv</span><span>Kreise: aktuelle Aktivierung · Linien: <span id="line-what">Gewichte</span></span></div>
+        <p class="small" id="net-info"></p>
+      </div>
+      <div class="netbox">
+        <h3>W1: Eingang → verborgen <span id="w1max"></span></h3>
+        <canvas id="w1" aria-label="Gewichtsmatrix W1"></canvas>
+        <h3>W2: verborgen → Ausgang <span id="w2max"></span></h3>
+        <canvas id="w2" aria-label="Gewichtsmatrix W2"></canvas>
+        <p class="small">Spalten je Bein: α β γ. Gleiche Farbskala wie die Linien.</p>
+        <p class="small" id="mat-info">Zeige auf eine Kachel, um ihr Gewicht zu sehen.</p>
+      </div>
+    </div>
+    <p class="small">Rechenweg wie beim Ziffern-Projekt: h = tanh(x·W1 + b1), y = tanh(h·W2 + b2). Das Netz rechnet 60-mal pro Sekunde; die Muskeln folgen dem Befehl mit 50 ms Verzögerung. In den anderen Steuerungsarten rechnet das Netz nur mit, steuert aber nicht.</p>
+  </section>
+
+  <section class="panel">
+    <h2>Gelenkwinkel (Grad)</h2>
+    <p class="small">α dreht das Bein von oben gesehen (+ = nach vorne). β hebt den Oberschenkel, γ beugt das Knie – beides in Z-Richtung, von oben nicht direkt sichtbar. In der Handsteuerung kannst du die Sollwerte hier einstellen.</p>
+    <div class="joints" id="joints"></div>
+  </section>
+</div>
+
+<script>
+// ---- src/ant.js ----
+// Ameise: Geometrie, Gelenke und Vorwärtskinematik.
+// Einheiten: cm, s, Masse relativ (nur Verhältnisse zählen), Winkel intern in Radiant.
+// Körperkoordinaten: x' nach vorne (zum Kopf), y' nach links, z nach oben.
+
+const DEG = Math.PI / 180;
+
+const LEG_NAMES = ["L1", "L2", "L3", "R1", "R2", "R3"];
+const JOINT_NAMES = ["α Hüfte (dreh)", "β Hüfte (heben)", "γ Knie"];
+
+// Gelenkgrenzen [min, max] in Grad, gleich für alle Beine
+const JOINT_LIMITS = [
+  [-40, 40],   // α: Drehung um die Hochachse, + = nach vorne
+  [-20, 60],   // β: Oberschenkel heben, + = nach oben
+  [20, 130],   // γ: Knie beugen, + = Unterschenkel nach unten
+];
+const JOINT_MAX_SPEED = 900 * DEG;  // rad/s
+const JOINT_KP = 200;               // 1/s, wie schnell ein Gelenk dem Sollwert folgt
+
+const ANT_GEOM = (() => {
+  // 3 Massenpunkte entlang der Körperachse; x relativ zum Thorax-Mittelpunkt
+  const segments = [
+    { name: "Kopf", x: 0.42, m: 0.25, rx: 0.13, ry: 0.11 },
+    { name: "Thorax", x: 0.12, m: 0.35, rx: 0.17, ry: 0.09 },
+    { name: "Abdomen", x: -0.32, m: 0.6, rx: 0.25, ry: 0.17 },
+  ];
+  const mass = segments.reduce((s, g) => s + g.m, 0);
+  const comX = segments.reduce((s, g) => s + g.m * g.x, 0) / mass;
+  // Ab hier alles relativ zum Schwerpunkt
+  for (const g of segments) g.x -= comX;
+  const inertia = segments.reduce((s, g) => s + g.m * (g.x * g.x + (g.rx * g.rx + g.ry * g.ry) / 4), 0);
+
+  const thoraxX = segments[1].x;
+  const legs = [];
+  const hipX = [0.08, 0.0, -0.08];      // relativ zum Thorax
+  const restDeg = [45, 90, 135];         // Ruherichtung von oben, 0° = nach vorne
+  for (let side = 0; side < 2; side++) {
+    const s = side === 0 ? 1 : -1;       // links +1, rechts -1
+    for (let i = 0; i < 3; i++) {
+      legs.push({ name: LEG_NAMES[side * 3 + i], side: s, hipX: thoraxX + hipX[i], hipY: s * 0.07, rest: restDeg[i] * DEG });
+    }
+  }
+  const head = segments[0];
+  return {
+    segments, mass, inertia, legs,
+    hipHeight: 0.2, femur: 0.35, tibia: 0.45,
+    // Fühler: zweiteilig (Schaft + Geissel), ab der Kopfspitze
+    antenna: { baseX: head.x + head.rx * 0.8, baseY: 0.04, scape: 0.2, flag: 0.3, angle1: 35 * DEG, angle2: 20 * DEG },
+  };
+})();
+
+function createAnt(x = 0, y = 0, heading = Math.PI / 2) {
+  const joints = new Float64Array(18);
+  for (let l = 0; l < 6; l++) joints.set(NEUTRAL_POSE[l], l * 3);
+  const ant = {
+    x, y, heading, vx: 0, vy: 0, omega: 0,
+    joints, targets: Float64Array.from(joints),
+    feet: [],          // pro Bein: Fuss in Körperkoordinaten {x, y, z}, Knie {kx, ky}
+    contact: new Uint8Array(6),
+    footForce: Array.from({ length: 6 }, () => ({ x: 0, y: 0 })),
+    slipping: new Uint8Array(6),
+    anchors: Array.from({ length: 6 }, () => null),   // Haftpunkt des Fusses in Weltkoordinaten
+    bellyFrac: 0,
+  };
+  updateKinematics(ant);
+  return ant;
+}
+
+// Fuss- und Knieposition eines Beins in Körperkoordinaten
+function legKinematics(leg, a, b, g) {
+  const G = ANT_GEOM;
+  const dir = leg.side * (leg.rest - a);           // Richtung von oben, + a schwenkt zum Kopf
+  const cx = Math.cos(dir), cy = Math.sin(dir);
+  const r1 = G.femur * Math.cos(b);
+  const z1 = G.hipHeight + G.femur * Math.sin(b);
+  const r2 = G.tibia * Math.cos(b - g);
+  const z = z1 + G.tibia * Math.sin(b - g);
+  return {
+    kx: leg.hipX + cx * r1, ky: leg.hipY + cy * r1, kz: z1,
+    x: leg.hipX + cx * (r1 + r2), y: leg.hipY + cy * (r1 + r2), z,
+  };
+}
+
+// Inverse Kinematik: Gelenkwinkel [α, β, γ], damit der Fuss bei (fx, fy, fz) in Körperkoordinaten steht.
+// Knie oben (wie bei der Ameise). Zu weite Ziele werden auf die maximale Reichweite gekürzt.
+function legIK(leg, fx, fy, fz) {
+  const G = ANT_GEOM, L1 = G.femur, L2 = G.tibia;
+  const dx = fx - leg.hipX, dy = fy - leg.hipY;
+  const a = leg.rest - leg.side * Math.atan2(dy, dx);
+  const r = Math.hypot(dx, dy), dz = fz - G.hipHeight;
+  const D = Math.min(Math.hypot(r, dz), 0.98 * (L1 + L2));
+  const g = Math.acos(Math.max(-1, Math.min(1, (D * D - L1 * L1 - L2 * L2) / (2 * L1 * L2))));
+  const b = Math.atan2(dz, r) + Math.atan2(L2 * Math.sin(g), L1 + L2 * Math.cos(g));
+  return [a, b, g];
+}
+
+// Grundstellung: Fuss in Ruherichtung, 0.5 cm von der Hüfte, knapp unter Bodenhöhe
+const STANCE_REACH = 0.5, STANCE_Z = -0.01;
+const NEUTRAL_FEET = ANT_GEOM.legs.map((leg) => {
+  const dir = leg.side * leg.rest;
+  return { x: leg.hipX + STANCE_REACH * Math.cos(dir), y: leg.hipY + STANCE_REACH * Math.sin(dir) };
+});
+const NEUTRAL_POSE = ANT_GEOM.legs.map((leg, l) => legIK(leg, NEUTRAL_FEET[l].x, NEUTRAL_FEET[l].y, STANCE_Z));
+
+function updateKinematics(ant) {
+  const j = ant.joints;
+  ant.feet = ANT_GEOM.legs.map((leg, l) => legKinematics(leg, j[l * 3], j[l * 3 + 1], j[l * 3 + 2]));
+}
+
+function clampTarget(i, v) {
+  const [lo, hi] = JOINT_LIMITS[i % 3];
+  return Math.min(hi * DEG, Math.max(lo * DEG, v));
+}
+
+// Körperkoordinaten -> Welt
+function toWorld(ant, px, py) {
+  const c = Math.cos(ant.heading), s = Math.sin(ant.heading);
+  return { x: ant.x + c * px - s * py, y: ant.y + s * px + c * py };
+}
+
+// Fühlerspitzen (später Duftsensoren): [links, rechts] in Weltkoordinaten
+function antennaPoints(ant) {
+  const A = ANT_GEOM.antenna;
+  return [1, -1].map((s) => {
+    const a1 = s * A.angle1, a2 = s * (A.angle1 + A.angle2);
+    const bx = A.baseX, by = s * A.baseY;
+    const ex = bx + A.scape * Math.cos(a1), ey = by + A.scape * Math.sin(a1);
+    const tx = ex + A.flag * Math.cos(a2), ty = ey + A.flag * Math.sin(a2);
+    return { base: toWorld(ant, bx, by), elbow: toWorld(ant, ex, ey), tip: toWorld(ant, tx, ty) };
+  });
+}
+</script>
+<script>
+// ---- src/physics.js ----
+// Einfaches Physikmodell: starrer Körper in der Ebene (x, y, Drehung), Beine als Kinematik.
+// Vortrieb entsteht nur durch Reibung an den Füssen, die den Boden berühren (z <= 0).
+//
+// Reibung pro Fuss ("Haften"): Beim Aufsetzen merkt sich der Fuss einen Ankerpunkt am Boden.
+// Eine steife Feder mit Dämpfer hält ihn dort, begrenzt auf mu * N (Coulomb). Reicht die Reibung
+// nicht, gleitet der Fuss und der Anker wandert mit. Die Kräfte werden implizit gelöst
+// (3x3-Gleichungssystem für vx, vy, omega), damit die Simulation auch bei steifen Federn stabil bleibt.
+
+const PHYSICS_DT = 1 / 240;   // fester Zeitschritt in s
+
+const WORLD_DEFAULTS = {
+  g: 981,              // cm/s²
+  slopeDeg: 15,        // Neigung der Ebene; hangaufwärts = +y
+  mu: 0.8,             // Reibung Fuss/Boden
+  muBelly: 0.6,        // Reibung, wenn der Bauch aufliegt
+  minSupport: 3,       // weniger Standbeine -> Bauch trägt einen Teil des Gewichts
+  legGive: 0.05,       // Nachgiebigkeit des Beins in cm: so weit federt ein Fuss unter 1/3 Körpergewicht
+                       // seitlich, bevor er rutscht. Echte Beine sind elastisch; ganz steif müssten die
+                       // Füsse geometrisch perfekt zusammenarbeiten, sonst rutscht immer einer.
+  legDamping: 0.5,     // Dämpfungsgrad der Beinfeder (1 = kritisch gedämpft)
+};
+
+function moveJoints(ant, dt) {
+  const j = ant.joints, t = ant.targets;
+  const maxStep = JOINT_MAX_SPEED * dt;
+  for (let i = 0; i < 18; i++) {
+    const target = clampTarget(i, t[i]);
+    const step = Math.max(-maxStep, Math.min(maxStep, JOINT_KP * (target - j[i]) * dt));
+    j[i] += step;
+  }
+}
+
+function solve3(A, b) {
+  // Gauss-Elimination ohne Pivotsuche (A ist symmetrisch positiv definit)
+  const M = [A[0].slice(), A[1].slice(), A[2].slice()], r = b.slice();
+  for (let i = 0; i < 3; i++) {
+    for (let k = i + 1; k < 3; k++) {
+      const f = M[k][i] / M[i][i];
+      for (let c = i; c < 3; c++) M[k][c] -= f * M[i][c];
+      r[k] -= f * r[i];
+    }
+  }
+  const x = [0, 0, 0];
+  for (let i = 2; i >= 0; i--) {
+    let s = r[i];
+    for (let c = i + 1; c < 3; c++) s -= M[i][c] * x[c];
+    x[i] = s / M[i][i];
+  }
+  return x;
+}
+
+function physicsStep(ant, world, dt) {
+  const G = ANT_GEOM;
+  const m = G.mass, I = G.inertia;
+  const slope = world.slopeDeg * DEG;
+
+  // 1. Gelenke bewegen, Fussbewegung relativ zum Körper bestimmen
+  const oldFeet = ant.feet;
+  moveJoints(ant, dt);
+  updateKinematics(ant);
+
+  const c = Math.cos(ant.heading), s = Math.sin(ant.heading);
+  const contacts = [];
+  for (let l = 0; l < 6; l++) {
+    const f = ant.feet[l], o = oldFeet[l];
+    ant.contact[l] = f.z <= 0 ? 1 : 0;
+    ant.slipping[l] = 0;
+    ant.footForce[l].x = 0; ant.footForce[l].y = 0;
+    if (!ant.contact[l]) { ant.anchors[l] = null; continue; }
+    const rx = c * f.x - s * f.y, ry = s * f.x + c * f.y;   // Hebelarm in Weltrichtung
+    if (!ant.anchors[l]) ant.anchors[l] = { x: ant.x + rx, y: ant.y + ry };
+    const ulx = (f.x - o.x) / dt, uly = (f.y - o.y) / dt;
+    contacts.push({
+      leg: l, rx, ry,
+      ux: c * ulx - s * uly, uy: s * ulx + c * uly,          // Fussgeschwindigkeit relativ zum Körper
+      ex: ant.x + rx - ant.anchors[l].x, ey: ant.y + ry - ant.anchors[l].y,   // Abstand zum Anker
+      mu: world.mu, N: 0, slip: false, fx: 0, fy: 0,
+    });
+  }
+
+  // 2. Normalkräfte: Gewicht auf die Standbeine verteilt; bei zu wenigen trägt der Bauch
+  //    (verteilt auf die 3 Körpersegmente) den Rest
+  const Ntot = m * world.g * Math.cos(slope);
+  const nLegs = contacts.length;
+  ant.bellyFrac = Math.max(0, (world.minSupport - nLegs) / world.minSupport);
+  for (const ct of contacts) ct.N = Ntot * (1 - ant.bellyFrac) / nLegs;
+  if (ant.bellyFrac > 0) {
+    for (const g of G.segments) {
+      contacts.push({ leg: -1, rx: c * g.x, ry: s * g.x, ux: 0, uy: 0, ex: 0, ey: 0,
+        mu: world.muBelly, N: Ntot * ant.bellyFrac * g.m / m, slip: false, fx: 0, fy: 0 });
+    }
+  }
+
+  // 3. Haften/Gleiten implizit lösen
+  // Feder kp und Dämpfer kd pro Fuss; implizit: F = -k * (v_rutsch + kp/k * Abstand) mit k = kd + kp*dt
+  const kp = m * world.g / 3 / world.legGive;
+  const kd = 2 * world.legDamping * Math.sqrt(kp * m / 3);
+  const k = kd + kp * dt;
+  for (const ct of contacts) { ct.ux += kp / k * ct.ex; ct.uy += kp / k * ct.ey; }
+  const Fgx = 0, Fgy = -m * world.g * Math.sin(slope);
+  let sol = [ant.vx, ant.vy, ant.omega];
+  for (let iter = 0; iter < 5; iter++) {
+    const A = [[m, 0, 0], [0, m, 0], [0, 0, I]];
+    const b = [m * ant.vx + dt * Fgx, m * ant.vy + dt * Fgy, I * ant.omega];
+    for (const ct of contacts) {
+      const jx = -ct.ry, jy = ct.rx;    // omega x r = omega * (jx, jy)
+      if (ct.slip) {
+        b[0] += dt * ct.fx; b[1] += dt * ct.fy; b[2] += dt * (jx * ct.fx + jy * ct.fy);
+      } else {
+        const kd = dt * k;
+        A[0][0] += kd; A[1][1] += kd;
+        A[0][2] += kd * jx; A[2][0] += kd * jx;
+        A[1][2] += kd * jy; A[2][1] += kd * jy;
+        A[2][2] += kd * (jx * jx + jy * jy);
+        b[0] -= kd * ct.ux; b[1] -= kd * ct.uy; b[2] -= kd * (jx * ct.ux + jy * ct.uy);
+      }
+    }
+    sol = solve3(A, b);
+    let changed = false;
+    for (const ct of contacts) {
+      if (ct.slip) continue;
+      const jx = -ct.ry, jy = ct.rx;
+      const fx = -k * (sol[0] + sol[2] * jx + ct.ux);
+      const fy = -k * (sol[1] + sol[2] * jy + ct.uy);
+      const fmax = ct.mu * ct.N, fn = Math.hypot(fx, fy);
+      if (fn > fmax) {
+        ct.slip = true; ct.fx = fx / fn * fmax; ct.fy = fy / fn * fmax; changed = true;
+      } else {
+        ct.fx = fx; ct.fy = fy;
+      }
+    }
+    if (!changed) break;
+  }
+
+  // 4. Integrieren
+  ant.vx = sol[0]; ant.vy = sol[1]; ant.omega = sol[2];
+  ant.x += ant.vx * dt; ant.y += ant.vy * dt; ant.heading += ant.omega * dt;
+  for (const ct of contacts) {
+    if (ct.leg < 0) continue;
+    ant.footForce[ct.leg].x = ct.fx; ant.footForce[ct.leg].y = ct.fy;
+    ant.slipping[ct.leg] = ct.slip ? 1 : 0;
+    if (ct.slip) ant.anchors[ct.leg] = null;   // gleitender Fuss: neuer Anker im nächsten Schritt
+  }
+}
+</script>
+<script>
+// ---- src/gait.js ----
+// Fest programmierter Dreifuss-Gang (Tripod) zum Testen der Physik.
+// Gruppe A = L1, R2, L3 und Gruppe B = R1, L2, R3 sind um eine halbe Periode versetzt.
+// Standphase (Fuss unten): Fuss läuft gerade nach hinten und schiebt den Körper vorwärts.
+// Schwungphase (Fuss oben): Fuss wird angehoben und wieder nach vorne gebracht.
+// Die Gelenkwinkel kommen aus der inversen Kinematik (legIK) – das Netz muss das später selbst lernen.
+
+const GAIT_DEFAULTS = {
+  freq: 3,          // Schritte pro Sekunde
+  stride: 0.2,      // halbe Schrittlänge in cm
+  lift: 0.15,       // Hubhöhe des Fusses in cm
+  turn: 0,          // -1 .. 1, positiv: links kürzere Schritte -> Drehung nach links (±50 % Schrittlänge)
+};
+
+const TRIPOD_GROUP = [0, 1, 0, 1, 0, 1];   // L1 L2 L3 R1 R2 R3
+
+function tripodTargets(ant, t, p) {
+  for (let l = 0; l < 6; l++) {
+    const leg = ANT_GEOM.legs[l];
+    const phase = 2 * Math.PI * p.freq * t + (TRIPOD_GROUP[l] ? Math.PI : 0);
+    const sn = Math.sin(phase);
+    const stride = p.stride * (1 - 0.5 * leg.side * p.turn);
+    const fx = NEUTRAL_FEET[l].x + stride * Math.cos(phase);
+    const fz = STANCE_Z + (sn < 0 ? -sn * p.lift : 0);
+    ant.targets.set(legIK(leg, fx, NEUTRAL_FEET[l].y, fz), l * 3);
+  }
+}
+</script>
+<script>
+// ---- src/scent.js ----
+// Duftfeld und Fühler-Sensoren.
+// Die Duftquelle liegt oben am Hang (auf der Ziellinie). Konzentration C = exp(-Abstand / λ), 0..1.
+// Jede Fühlerspitze misst C (optional mit Rauschen). Für das Netz werden daraus normierte Werte:
+//   intensity = Mittelwert von C (0 = weit weg, 1 = an der Quelle)
+//   diff      = (ln C_links − ln C_rechts) · λ / Fühlerabstand, etwa −1..+1
+//               > 0: Duft kommt eher von links,  < 0: eher von rechts
+// Der Logarithmus wirkt wie beim echten Geruchssinn: Er misst relative Unterschiede, damit die
+// Richtung auch weit weg von der Quelle noch erkennbar ist.
+
+const SCENT_DEFAULTS = {
+  x: 0, y: 20,     // Quelle, Weltkoordinaten in cm (y = Ziellinie)
+  lambda: 10,      // Reichweite in cm (Abfall auf 37 %)
+  noise: 0,        // relatives Messrauschen pro Fühler, z. B. 0.05 = 5 %
+};
+
+function scentAt(scent, x, y) {
+  return Math.exp(-Math.hypot(x - scent.x, y - scent.y) / scent.lambda);
+}
+
+// Normalverteilte Zufallszahl; rng liefert gleichverteilt 0..1 (für reproduzierbare Episoden austauschbar)
+function gauss(rng) {
+  return Math.sqrt(-2 * Math.log(1 - rng())) * Math.cos(2 * Math.PI * rng());
+}
+
+function senseScent(ant, scent, rng = Math.random) {
+  const [l, r] = antennaPoints(ant);
+  const read = (p) => {
+    const c = scentAt(scent, p.tip.x, p.tip.y);
+    return scent.noise > 0 ? Math.max(1e-9, c * (1 + scent.noise * gauss(rng))) : c;
+  };
+  const left = read(l), right = read(r);
+  const span = Math.hypot(l.tip.x - r.tip.x, l.tip.y - r.tip.y);
+  const diff = (Math.log(left) - Math.log(right)) * scent.lambda / span;
+  return { left, right, intensity: (left + right) / 2, diff: Math.max(-1.5, Math.min(1.5, diff)) };
+}
+
+// Einfache Test-Lenkung (Braitenberg): stärker riechende Seite -> dorthin drehen.
+// Geglättet (Zeitkonstante tau), weil der Kopf beim Gehen hin und her pendelt.
+// Nur zum Prüfen der Sensoren; später übernimmt das Netz.
+function scentSteer(prevTurn, sense, gain, dt, tau = 0.3) {
+  const want = Math.max(-1, Math.min(1, gain * sense.diff));
+  return prevTurn + (want - prevTurn) * Math.min(1, dt / tau);
+}
+</script>
+<script>
+// ---- src/nn.js ----
+// 3-Schicht-Netz wie beim Ziffern-Projekt: h = tanh(x·W1 + b1), y = tanh(h·W2 + b2).
+// Gewichte zeilenweise: W1[i * H + j] verbindet Eingang i mit verborgenem Neuron j,
+//                       W2[j * O + k] verbindet verborgenes Neuron j mit Ausgang k.
+// Gelernt wird später nicht mit Backpropagation, sondern per Neuroevolution (mutieren + auswählen).
+
+// Reproduzierbarer Zufall (mulberry32): gleicher Startwert -> gleiche Gewichte, gleiche Mutationen
+function makeRng(seed) {
+  let a = seed >>> 0;
+  return () => {
+    a = (a + 0x6D2B79F5) >>> 0;
+    let t = a;
+    t = Math.imul(t ^ (t >>> 15), t | 1);
+    t ^= t + Math.imul(t ^ (t >>> 7), t | 61);
+    return ((t ^ (t >>> 14)) >>> 0) / 4294967296;
+  };
+}
+
+function randn(rng) {
+  return Math.sqrt(-2 * Math.log(1 - rng())) * Math.cos(2 * Math.PI * rng());
+}
+
+// Startgewichte ~ N(0, 1/Eingänge), damit tanh nicht gleich in die Sättigung geht; Schwellen 0
+function createNet(nIn, nHid, nOut, rng) {
+  const net = {
+    nIn, nHid, nOut,
+    W1: new Float64Array(nIn * nHid), b1: new Float64Array(nHid),
+    W2: new Float64Array(nHid * nOut), b2: new Float64Array(nOut),
+    // letzte Aktivierungen, für die Anzeige
+    x: new Float64Array(nIn), h: new Float64Array(nHid), y: new Float64Array(nOut),
+  };
+  const s1 = 1 / Math.sqrt(nIn), s2 = 1 / Math.sqrt(nHid);
+  for (let i = 0; i < net.W1.length; i++) net.W1[i] = randn(rng) * s1;
+  for (let i = 0; i < net.W2.length; i++) net.W2[i] = randn(rng) * s2;
+  return net;
+}
+
+function netForward(net, x) {
+  const { nIn, nHid, nOut, W1, b1, W2, b2, h, y } = net;
+  net.x.set(x);
+  for (let j = 0; j < nHid; j++) h[j] = b1[j];
+  for (let i = 0; i < nIn; i++) {
+    const xi = x[i];
+    if (xi === 0) continue;
+    const row = i * nHid;
+    for (let j = 0; j < nHid; j++) h[j] += xi * W1[row + j];
+  }
+  for (let j = 0; j < nHid; j++) h[j] = Math.tanh(h[j]);
+  for (let k = 0; k < nOut; k++) y[k] = b2[k];
+  for (let j = 0; j < nHid; j++) {
+    const hj = h[j], row = j * nOut;
+    for (let k = 0; k < nOut; k++) y[k] += hj * W2[row + k];
+  }
+  for (let k = 0; k < nOut; k++) y[k] = Math.tanh(y[k]);
+  return y;
+}
+
+function netClone(net) {
+  const c = createNet(net.nIn, net.nHid, net.nOut, () => 0.5);
+  for (const k of ["W1", "b1", "W2", "b2"]) c[k].set(net[k]);
+  return c;
+}
+
+// Mutation: auf jedes Gewicht und jede Schwelle Gauss-Rauschen mit Stärke sigma
+function netMutate(net, sigma, rng) {
+  for (const k of ["W1", "b1", "W2", "b2"]) {
+    const a = net[k];
+    for (let i = 0; i < a.length; i++) a[i] += sigma * randn(rng);
+  }
+  return net;
+}
+
+function netParamCount(net) {
+  return net.W1.length + net.b1.length + net.W2.length + net.b2.length;
+}
+
+function netToJSON(net) {
+  const r = (a) => Array.from(a, (v) => +v.toFixed(6));
+  return { nIn: net.nIn, nHid: net.nHid, nOut: net.nOut, W1: r(net.W1), b1: r(net.b1), W2: r(net.W2), b2: r(net.b2) };
+}
+
+function netFromJSON(o) {
+  const net = createNet(o.nIn, o.nHid, o.nOut, () => 0.5);
+  for (const k of ["W1", "b1", "W2", "b2"]) {
+    if (o[k].length !== net[k].length) throw new Error(`Netz-Datei passt nicht: ${k} hat ${o[k].length} statt ${net[k].length} Werte`);
+    net[k].set(o[k]);
+  }
+  return net;
+}
+</script>
+<script>
+// ---- src/brain.js ----
+// Gehirn der Ameise: Sensoren -> Netz-Eingänge, Netz-Ausgänge -> Gelenk-Sollwerte.
+//
+// Eingänge (28), alle etwa im Bereich −1..+1:
+//   Duft Stärke (0..1), Duft Richtung (−1 rechts .. +1 links)
+//   Takt sin/cos: innerer Taktgeber, gibt dem Netz einen Rhythmus für den Gang
+//   6 × Fusskontakt (1 = am Boden)
+//   18 × Gelenkwinkel, auf den Gelenkbereich normiert (−1 = Minimum, +1 = Maximum)
+// Ausgänge (18): Sollwert pro Gelenk, tanh −1..+1 -> Gelenkbereich (0 = Mitte)
+//
+// Wie bei echten Tieren ist die Steuerung träge: Das Netz rechnet nur rateHz-mal pro Sekunde,
+// und die Muskeln folgen dem Befehl mit der Zeitkonstante muscleTau. Ohne das kann ein Netz die
+// Gelenke mit 50–90 Hz zittern lassen, und die Füsse rutschen nur noch.
+
+const BRAIN_DEFAULTS = { hidden: 16, clockHz: 3, rateHz: 60, muscleTau: 0.05 };
+
+const INPUT_GROUPS = [
+  { name: "Duft", from: 0, n: 2 },
+  { name: "Takt", from: 2, n: 2 },
+  { name: "Kontakt", from: 4, n: 6 },
+  { name: "Winkel", from: 10, n: 18 },
+];
+const JOINT_SHORT = ["α", "β", "γ"];
+const JOINT_LABELS = LEG_NAMES.flatMap((l) => JOINT_SHORT.map((j) => `${l} ${j}`));
+const INPUT_NAMES = ["Duft Stärke", "Duft Richtung", "Takt sin", "Takt cos",
+  ...LEG_NAMES.map((l) => `Kontakt ${l}`), ...JOINT_LABELS];
+const OUTPUT_NAMES = JOINT_LABELS;
+const N_IN = INPUT_NAMES.length, N_OUT = OUTPUT_NAMES.length;
+
+function createBrain(seed, hidden = BRAIN_DEFAULTS.hidden) {
+  return createNet(N_IN, hidden, N_OUT, makeRng(seed));
+}
+
+function brainInputs(ant, sense, t, clockHz, x = new Float64Array(N_IN)) {
+  x[0] = sense.intensity;
+  x[1] = Math.max(-1, Math.min(1, sense.diff));
+  const ph = 2 * Math.PI * clockHz * t;
+  x[2] = Math.sin(ph); x[3] = Math.cos(ph);
+  for (let l = 0; l < 6; l++) x[4 + l] = ant.contact[l];
+  for (let i = 0; i < 18; i++) {
+    const [lo, hi] = JOINT_LIMITS[i % 3];
+    x[10 + i] = (2 * ant.joints[i] / DEG - lo - hi) / (hi - lo);
+  }
+  return x;
+}
+
+// Muskel: Sollwert läuft dem Netz-Befehl mit Zeitkonstante tau nach (dt = Zeit seit letztem Befehl)
+function applyBrainOutputs(ant, y, dt = Infinity, tau = BRAIN_DEFAULTS.muscleTau) {
+  const f = Math.min(1, dt / tau);
+  for (let i = 0; i < 18; i++) {
+    const [lo, hi] = JOINT_LIMITS[i % 3];
+    const want = (lo + (y[i] + 1) / 2 * (hi - lo)) * DEG;
+    ant.targets[i] += (want - ant.targets[i]) * f;
+  }
+}
+
+// Steuerung über die Zeit: ruft das Netz nur alle 1/rateHz Sekunden auf, dazwischen bleibt der Befehl.
+function createController(net, params = BRAIN_DEFAULTS) {
+  return { net, params, nextT: 0 };
+}
+
+// apply = false: Netz rechnet nur mit (für die Anzeige), steuert aber nicht
+function controllerStep(ctrl, ant, sense, t, apply = true) {
+  const p = ctrl.params, period = 1 / p.rateHz;
+  if (t + 1e-9 >= ctrl.nextT) {
+    brainInputs(ant, sense, t, p.clockHz, ctrl.net.x);
+    netForward(ctrl.net, ctrl.net.x);
+    ctrl.nextT += period;
+  }
+  // Muskel bei jedem Physikschritt nachführen
+  if (apply) applyBrainOutputs(ant, ctrl.net.y, PHYSICS_DT, p.muscleTau);
+}
+</script>
+<script>
+// ---- src/render.js ----
+// Zeichnen: Welt von oben (Hang, Höhenlinien, Ziel), Ameise, Kräfte und Gangbild.
+// Die Kamera folgt der Ameise; Welt-y (hangaufwärts) zeigt auf dem Bildschirm nach oben.
+
+function cssVar(name) {
+  return getComputedStyle(document.documentElement).getPropertyValue(name).trim();
+}
+
+function fitCanvas(cv) {
+  const dpr = window.devicePixelRatio || 1;
+  const w = cv.clientWidth, h = cv.clientHeight;
+  if (cv.width !== Math.round(w * dpr) || cv.height !== Math.round(h * dpr)) {
+    cv.width = Math.round(w * dpr); cv.height = Math.round(h * dpr);
+  }
+  const ctx = cv.getContext("2d");
+  ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+  return { ctx, w, h };
+}
+
+function drawWorld(cv, world, ant, view) {
+  const { ctx, w, h } = fitCanvas(cv);
+  const sc = view.scale;                         // px pro cm
+  const sx = (x) => w / 2 + (x - view.cx) * sc;
+  const sy = (y) => h / 2 - (y - view.cy) * sc;
+  const toWx = (px) => view.cx + (px - w / 2) / sc;
+  const toWy = (py) => view.cy - (py - h / 2) / sc;
+
+  // Hang: Farbe nach Höhe, unten (Start) hell, oben (Ziel) kräftiger
+  const yTop = toWy(0), yBot = toWy(h);
+  const grad = ctx.createLinearGradient(0, sy(0), 0, sy(world.goalY));
+  grad.addColorStop(0, cssVar("--ground-lo"));
+  grad.addColorStop(1, cssVar("--ground-hi"));
+  ctx.fillStyle = grad;
+  ctx.fillRect(0, 0, w, h);
+
+  drawScent(ctx, world.scent, sx, sy, sc);
+
+  // Höhenlinien alle 1 cm (hangaufwärts), dicker alle 5 cm
+  ctx.font = "11px " + cssVar("--font-num");
+  ctx.textBaseline = "bottom";
+  const sin = Math.sin(world.slopeDeg * DEG);
+  for (let y = Math.floor(yBot); y <= yTop; y++) {
+    const major = y % 5 === 0;
+    ctx.strokeStyle = cssVar(major ? "--grid-major" : "--grid");
+    ctx.lineWidth = major ? 1.2 : 1;
+    ctx.beginPath(); ctx.moveTo(0, sy(y)); ctx.lineTo(w, sy(y)); ctx.stroke();
+    if (major) {
+      ctx.fillStyle = cssVar("--muted");
+      ctx.fillText(`${y} cm · Höhe ${(y * sin).toFixed(1)} cm`, 6, sy(y) - 2);
+    }
+  }
+  // senkrechte Hilfslinien, damit man seitliches Driften sieht
+  ctx.strokeStyle = cssVar("--grid");
+  for (let x = Math.floor(toWx(0)); x <= toWx(w); x++) {
+    ctx.beginPath(); ctx.moveTo(sx(x), 0); ctx.lineTo(sx(x), h); ctx.stroke();
+  }
+
+  // Start- und Ziellinie
+  for (const [y, label, col] of [[0, "Start", "--muted"], [world.goalY, "Ziel", "--goal"]]) {
+    const py = sy(y);
+    if (py < -20 || py > h + 20) continue;
+    ctx.strokeStyle = cssVar(col); ctx.lineWidth = 2.5; ctx.setLineDash([8, 6]);
+    ctx.beginPath(); ctx.moveTo(0, py); ctx.lineTo(w, py); ctx.stroke(); ctx.setLineDash([]);
+    ctx.fillStyle = cssVar(col); ctx.font = "600 12px " + cssVar("--font-ui");
+    ctx.fillText(label, w - 44, py - 4);
+  }
+
+  // Spur
+  if (view.trail.length > 1) {
+    ctx.strokeStyle = cssVar("--trail"); ctx.lineWidth = 2;
+    ctx.beginPath();
+    view.trail.forEach((p, i) => (i ? ctx.lineTo(sx(p.x), sy(p.y)) : ctx.moveTo(sx(p.x), sy(p.y))));
+    ctx.stroke();
+  }
+
+  drawAnt(ctx, ant, sx, sy, sc, view);
+}
+
+// Duftwolke um die Quelle; Ringe bei C = 0.8, 0.6, 0.4, 0.2, 0.1
+function drawScent(ctx, scent, sx, sy, sc) {
+  const cx = sx(scent.x), cy = sy(scent.y), col = cssVar("--scent-rgb");
+  const R = 3 * scent.lambda * sc;
+  const g = ctx.createRadialGradient(cx, cy, 0, cx, cy, R);
+  for (let i = 0; i <= 6; i++) g.addColorStop(i / 6, `rgba(${col}, ${(0.35 * Math.exp(-3 * i / 6)).toFixed(3)})`);
+  g.addColorStop(1, `rgba(${col}, 0)`);
+  ctx.fillStyle = g;
+  ctx.beginPath(); ctx.arc(cx, cy, R, 0, 2 * Math.PI); ctx.fill();
+  ctx.strokeStyle = `rgba(${col}, 0.45)`; ctx.lineWidth = 1; ctx.setLineDash([3, 4]);
+  ctx.font = "11px " + cssVar("--font-num"); ctx.fillStyle = `rgba(${col}, 0.9)`; ctx.textBaseline = "bottom";
+  for (const c of [0.8, 0.6, 0.4, 0.2, 0.1]) {
+    const r = -Math.log(c) * scent.lambda * sc;
+    ctx.beginPath(); ctx.arc(cx, cy, r, 0, 2 * Math.PI); ctx.stroke();
+    ctx.fillText(c.toFixed(1), cx + r * 0.7071 + 3, cy + r * 0.7071 - 1);
+  }
+  ctx.setLineDash([]);
+  ctx.fillStyle = `rgb(${col})`;
+  ctx.beginPath(); ctx.arc(cx, cy, 6, 0, 2 * Math.PI); ctx.fill();
+  ctx.font = "600 12px " + cssVar("--font-ui"); ctx.fillText("Duftquelle", cx + 9, cy - 4);
+}
+
+function drawAnt(ctx, ant, sx, sy, sc, view) {
+  const G = ANT_GEOM;
+  const P = (px, py) => { const p = toWorld(ant, px, py); return [sx(p.x), sy(p.y)]; };
+  ctx.lineCap = "round"; ctx.lineJoin = "round";
+
+  // Beine: von oben gesehen; ein angehobenes Bein wirkt durch die Projektion kürzer
+  const legCol = cssVar("--ant-leg");
+  G.legs.forEach((leg, l) => {
+    const f = ant.feet[l];
+    const [hx, hy] = P(leg.hipX, leg.hipY), [kx, ky] = P(f.kx, f.ky), [fx, fy] = P(f.x, f.y);
+    ctx.strokeStyle = legCol;
+    ctx.lineWidth = Math.max(1.5, 0.06 * sc);
+    ctx.beginPath(); ctx.moveTo(hx, hy); ctx.lineTo(kx, ky); ctx.stroke();
+    ctx.lineWidth = Math.max(1, 0.04 * sc);
+    ctx.beginPath(); ctx.moveTo(kx, ky); ctx.lineTo(fx, fy); ctx.stroke();
+    // Fuss: gefüllt = Bodenkontakt, rot = rutscht, Ring = in der Luft
+    const r = Math.max(2.5, 0.05 * sc);
+    ctx.beginPath(); ctx.arc(fx, fy, r, 0, 2 * Math.PI);
+    if (ant.contact[l]) { ctx.fillStyle = cssVar(ant.slipping[l] ? "--slip" : "--stance"); ctx.fill(); }
+    else { ctx.strokeStyle = cssVar("--swing"); ctx.lineWidth = 1.5; ctx.stroke(); }
+  });
+
+  // Fühler (zweiteilig)
+  ctx.strokeStyle = legCol; ctx.lineWidth = Math.max(1, 0.03 * sc);
+  for (const a of antennaPoints(ant)) {
+    ctx.beginPath();
+    ctx.moveTo(sx(a.base.x), sy(a.base.y)); ctx.lineTo(sx(a.elbow.x), sy(a.elbow.y)); ctx.lineTo(sx(a.tip.x), sy(a.tip.y));
+    ctx.stroke();
+  }
+  // Fühlerspitzen = Duftsensoren
+  if (view.sense) {
+    const col = cssVar("--scent-rgb");
+    antennaPoints(ant).forEach((a) => {
+      ctx.beginPath(); ctx.arc(sx(a.tip.x), sy(a.tip.y), Math.max(2.5, 0.045 * sc), 0, 2 * Math.PI);
+      ctx.fillStyle = `rgb(${col})`; ctx.fill();
+    });
+  }
+
+  // Körper: Abdomen, Thorax, Kopf als Ellipsen
+  const rot = -ant.heading;     // Bildschirm-y zeigt nach unten
+  for (const g of [G.segments[2], G.segments[1], G.segments[0]]) {
+    const [cx, cy] = P(g.x, 0);
+    ctx.beginPath(); ctx.ellipse(cx, cy, g.rx * sc, g.ry * sc, rot, 0, 2 * Math.PI);
+    ctx.fillStyle = cssVar("--ant-body"); ctx.fill();
+    ctx.strokeStyle = cssVar("--ant-edge"); ctx.lineWidth = 1; ctx.stroke();
+  }
+
+  // Reibungskräfte an den Füssen (wirken auf den Körper)
+  if (view.showForces) {
+    const fs = view.forceScale * sc;
+    ctx.strokeStyle = cssVar("--force"); ctx.fillStyle = cssVar("--force"); ctx.lineWidth = 2;
+    G.legs.forEach((leg, l) => {
+      if (!ant.contact[l]) return;
+      const f = ant.feet[l], F = ant.footForce[l];
+      const [fx, fy] = P(f.x, f.y);
+      const ex = fx + F.x * fs, ey = fy - F.y * fs;
+      if (Math.hypot(ex - fx, ey - fy) < 2) return;
+      arrow(ctx, fx, fy, ex, ey);
+    });
+  }
+}
+
+function arrow(ctx, x0, y0, x1, y1) {
+  const a = Math.atan2(y1 - y0, x1 - x0), s = 6;
+  ctx.beginPath(); ctx.moveTo(x0, y0); ctx.lineTo(x1, y1); ctx.stroke();
+  ctx.beginPath(); ctx.moveTo(x1, y1);
+  ctx.lineTo(x1 - s * Math.cos(a - 0.4), y1 - s * Math.sin(a - 0.4));
+  ctx.lineTo(x1 - s * Math.cos(a + 0.4), y1 - s * Math.sin(a + 0.4));
+  ctx.closePath(); ctx.fill();
+}
+
+// Gangbild: pro Bein eine Zeile, dunkel = Fuss am Boden, rot = rutscht. Neueste Werte rechts.
+function drawGait(cv, history) {
+  const { ctx, w, h } = fitCanvas(cv);
+  ctx.fillStyle = cssVar("--surface"); ctx.fillRect(0, 0, w, h);
+  const labelW = 26, rowH = h / 6, n = history.length;
+  const colW = (w - labelW) / GAIT_HISTORY;
+  ctx.font = "11px " + cssVar("--font-num"); ctx.textBaseline = "middle";
+  const stance = cssVar("--stance"), slip = cssVar("--slip");
+  for (let l = 0; l < 6; l++) {
+    ctx.fillStyle = cssVar("--muted");
+    ctx.fillText(LEG_NAMES[l], 2, (l + 0.5) * rowH);
+    for (let i = 0; i < n; i++) {
+      const v = history[i][l];
+      if (!v) continue;
+      ctx.fillStyle = v === 2 ? slip : stance;
+      ctx.fillRect(labelW + (GAIT_HISTORY - n + i) * colW, l * rowH + 2, Math.ceil(colW), rowH - 4);
+    }
+  }
+}
+const GAIT_HISTORY = 240;
+</script>
+<script>
+// ---- src/netview.js ----
+// Netz-Visualisierung wie beim Ziffern-Projekt:
+// Topologie (Eingänge | verborgene Neuronen | Ausgänge), Linien = Gewichte (rot negativ, blau positiv,
+// dicker = stärker), Kreise = aktuelle Aktivierung. Dazu die Gewichtsmatrizen W1 und W2 als Kacheln.
+// Mit der Maus (oder Antippen) ein Neuron wählen: nur seine Verbindungen werden hervorgehoben.
+
+function hexRgb(s) {
+  const c = document.createElement("canvas").getContext("2d");
+  c.fillStyle = s;
+  const h = c.fillStyle;
+  return h.startsWith("#") ? [1, 3, 5].map((i) => parseInt(h.slice(i, i + 2), 16)) : h.match(/\d+/g).slice(0, 3).map(Number);
+}
+let NV_COL = null;
+function nvColors() {
+  if (!NV_COL) NV_COL = { neg: hexRgb(cssVar("--neg")), mid: hexRgb(cssVar("--mid")), pos: hexRgb(cssVar("--pos")) };
+  return NV_COL;
+}
+if (typeof matchMedia !== "undefined") matchMedia("(prefers-color-scheme: dark)").addEventListener("change", () => { NV_COL = null; });
+
+function scaleRgb(t) {          // −1 … +1 -> rot … hell … blau
+  const C = nvColors();
+  t = Math.max(-1, Math.min(1, t));
+  const b = t < 0 ? C.neg : C.pos, u = Math.abs(t);
+  return [0, 1, 2].map((i) => Math.round(C.mid[i] + (b[i] - C.mid[i]) * u));
+}
+const rgba = (c, a = 1) => `rgba(${c[0]},${c[1]},${c[2]},${a})`;
+const maxAbs = (a) => { let m = 0; for (let i = 0; i < a.length; i++) { const v = Math.abs(a[i]); if (v > m) m = v; } return m; };
+
+// Positionen der Neuronen; Lücken zwischen Gruppen (Eingänge nach Sensorart, Ausgänge nach Bein)
+function netLayout(net, w) {
+  const top = 14, rowH = 15, gap = 9;
+  const inY = [], outY = [], hidY = [];
+  let y = top;
+  for (const g of INPUT_GROUPS) { for (let i = 0; i < g.n; i++) { inY.push(y + rowH / 2); y += rowH; } y += gap; }
+  const height = y - gap + top;
+  y = top + (height - 2 * top - (N_OUT * rowH + 5 * gap)) / 2;
+  for (let k = 0; k < N_OUT; k++) { outY.push(y + rowH / 2); y += rowH; if (k % 3 === 2) y += gap; }
+  const hsp = (height - 2 * top) / net.nHid;
+  for (let j = 0; j < net.nHid; j++) hidY.push(top + hsp * (j + 0.5));
+  const small = w < 560;
+  return { height, inX: small ? 84 : 104, hidX: w * 0.52, outX: w - (small ? 52 : 64), inY, hidY, outY, r: 5.5 };
+}
+
+// Wert, den eine Linie zeigt: Gewicht oder "Signal" = Gewicht × Aktivierung der Quelle
+function lineValues(net, mode) {
+  if (mode !== "flow") return [net.W1, net.W2];
+  const f1 = new Float64Array(net.W1.length), f2 = new Float64Array(net.W2.length);
+  for (let i = 0; i < net.nIn; i++) for (let j = 0; j < net.nHid; j++) f1[i * net.nHid + j] = net.W1[i * net.nHid + j] * net.x[i];
+  for (let j = 0; j < net.nHid; j++) for (let k = 0; k < net.nOut; k++) f2[j * net.nOut + k] = net.W2[j * net.nOut + k] * net.h[j];
+  return [f1, f2];
+}
+
+function drawNet(cv, net, st) {
+  const w = cv.clientWidth, L = netLayout(net, w);
+  if (cv.style.height !== L.height + "px") cv.style.height = L.height + "px";
+  const { ctx } = fitCanvas(cv);
+  ctx.clearRect(0, 0, w, L.height);
+  const [v1, v2] = lineValues(net, st.mode);
+  const m1 = maxAbs(v1) || 1, m2 = maxAbs(v2) || 1;
+  const sel = st.hover;   // {layer: 0|1|2, idx}
+  const lit = (layer, a, b) => !sel || (sel.layer === layer && sel.idx === a) || (sel.layer === layer + 1 && sel.idx === b);
+  const H = net.nHid, O = net.nOut;
+
+  const line = (x0, y0, x1, y1, v, m, on) => {
+    const u = Math.abs(v) / m;
+    if (u < 0.03 && on) return;
+    ctx.strokeStyle = rgba(v < 0 ? nvColors().neg : nvColors().pos, on ? (sel ? 0.25 + 0.75 * u : 0.05 + 0.5 * u) : 0.03);
+    ctx.lineWidth = on && sel ? 0.8 + 2.5 * u : 0.4 + 1.8 * u;
+    ctx.beginPath(); ctx.moveTo(x0, y0); ctx.lineTo(x1, y1); ctx.stroke();
+  };
+  // zuerst gedämpfte, dann hervorgehobene Linien (damit diese oben liegen)
+  for (const pass of [false, true]) {
+    for (let i = 0; i < net.nIn; i++) for (let j = 0; j < H; j++) {
+      const on = lit(0, i, j);
+      if (on === pass) line(L.inX, L.inY[i], L.hidX, L.hidY[j], v1[i * H + j], m1, on);
+    }
+    for (let j = 0; j < H; j++) for (let k = 0; k < O; k++) {
+      const on = lit(1, j, k);
+      if (on === pass) line(L.hidX, L.hidY[j], L.outX, L.outY[k], v2[j * O + k], m2, on);
+    }
+  }
+
+  const node = (x, y, v, layer, idx) => {
+    ctx.beginPath(); ctx.arc(x, y, L.r, 0, 2 * Math.PI);
+    ctx.fillStyle = rgba(scaleRgb(v)); ctx.fill();
+    const isSel = sel && sel.layer === layer && sel.idx === idx;
+    ctx.lineWidth = isSel ? 2.5 : 1; ctx.strokeStyle = isSel ? cssVar("--accent") : cssVar("--muted"); ctx.stroke();
+  };
+  ctx.font = "11px " + cssVar("--font-num"); ctx.textBaseline = "middle";
+  // Eingänge mit Namen links
+  ctx.textAlign = "right";
+  for (let i = 0; i < net.nIn; i++) {
+    node(L.inX, L.inY[i], net.x[i], 0, i);
+    ctx.fillStyle = cssVar(sel && sel.layer === 0 && sel.idx === i ? "--ink" : "--muted");
+    ctx.fillText(INPUT_NAMES[i], L.inX - L.r - 5, L.inY[i]);
+  }
+  for (let j = 0; j < H; j++) node(L.hidX, L.hidY[j], net.h[j], 1, j);
+  ctx.textAlign = "left";
+  for (let k = 0; k < O; k++) {
+    node(L.outX, L.outY[k], net.y[k], 2, k);
+    ctx.fillStyle = cssVar(sel && sel.layer === 2 && sel.idx === k ? "--ink" : "--muted");
+    ctx.fillText(OUTPUT_NAMES[k], L.outX + L.r + 5, L.outY[k]);
+  }
+  // Spaltentitel
+  ctx.textAlign = "center"; ctx.fillStyle = cssVar("--muted"); ctx.font = "600 11px " + cssVar("--font-ui");
+  ctx.fillText(`verborgen (${H})`, L.hidX, 6);
+  st.layout = L;
+}
+
+// Neuron unter der Maus finden
+function netHit(st, x, y) {
+  const L = st.layout;
+  if (!L) return null;
+  const cols = [[L.inX, L.inY, 0], [L.hidX, L.hidY, 1], [L.outX, L.outY, 2]];
+  let best = null, bd = 12;
+  for (const [cx, ys, layer] of cols) ys.forEach((cy, idx) => {
+    const d = Math.hypot(x - cx, y - cy);
+    if (d < bd) { bd = d; best = { layer, idx }; }
+  });
+  // auch auf den Namen zeigen erlaubt
+  if (!best) for (const [cx, ys, layer] of [[L.inX - 50, L.inY, 0], [L.outX + 25, L.outY, 2]]) ys.forEach((cy, idx) => {
+    if (Math.abs(y - cy) < 7 && Math.abs(x - cx) < 50) best = { layer, idx };
+  });
+  return best;
+}
+
+// Text zum gewählten Neuron: Wert, Schwelle und die stärksten Verbindungen
+function netHoverText(net, sel) {
+  if (!sel) return "Zeige mit der Maus auf ein Neuron (oder tippe es an), um nur seine Verbindungen zu sehen.";
+  const f = (v) => (v >= 0 ? "+" : "−") + Math.abs(v).toFixed(2);
+  const top = (pairs) => pairs.sort((a, b) => Math.abs(b[1]) - Math.abs(a[1])).slice(0, 4).map(([n, v]) => `${n} ${f(v)}`).join(", ");
+  const H = net.nHid, O = net.nOut;
+  if (sel.layer === 0) {
+    const i = sel.idx;
+    return `Eingang «${INPUT_NAMES[i]}» = ${f(net.x[i])}. Stärkste Gewichte zu: ` +
+      top(Array.from({ length: H }, (_, j) => [`N${j + 1}`, net.W1[i * H + j]]));
+  }
+  if (sel.layer === 1) {
+    const j = sel.idx;
+    return `Verborgenes Neuron N${j + 1}: h = tanh(Summe + b1) = ${f(net.h[j])}, Schwelle b1 = ${f(net.b1[j])}. ` +
+      `Stärkste Eingänge: ${top(Array.from({ length: net.nIn }, (_, i) => [INPUT_NAMES[i], net.W1[i * H + j]]))}. ` +
+      `Stärkste Ausgänge: ${top(Array.from({ length: O }, (_, k) => [OUTPUT_NAMES[k], net.W2[j * O + k]]))}.`;
+  }
+  const k = sel.idx, [lo, hi] = JOINT_LIMITS[k % 3];
+  return `Ausgang «${OUTPUT_NAMES[k]}» = ${f(net.y[k])} -> Sollwinkel ${Math.round(lo + (net.y[k] + 1) / 2 * (hi - lo))}° ` +
+    `(Bereich ${lo}…${hi}°), Schwelle b2 = ${f(net.b2[k])}. Stärkste Eingänge: ` +
+    top(Array.from({ length: H }, (_, j) => [`N${j + 1}`, net.W2[j * O + k]]));
+}
+
+// Gewichtsmatrix als Kacheln: Zeilen = Quelle, Spalten = Ziel. Gemeinsame Farbskala bis ±max.
+// colGroup = 3: Spalten in Dreiergruppen (ein Bein = α β γ), Beschriftung pro Gruppe.
+function drawMatrix(cv, M, rows, cols, rowLabels, colLabels, hl, colGroup = 1) {
+  const w = cv.clientWidth, top = 20;
+  const ctx0 = cv.getContext("2d");
+  ctx0.font = "10px " + cssVar("--font-num");
+  const labW = 8 + Math.max(...rowLabels.map((l) => ctx0.measureText(l).width));
+  const cw = (w - labW) / cols, ch = Math.max(9, Math.min(15, cw));
+  const h = top + rows * ch + 2;
+  if (cv.style.height !== h + "px") cv.style.height = h + "px";
+  const { ctx } = fitCanvas(cv);
+  ctx.clearRect(0, 0, w, h);
+  const m = maxAbs(M) || 1;
+  ctx.font = "10px " + cssVar("--font-num"); ctx.textBaseline = "middle";
+  ctx.fillStyle = cssVar("--muted"); ctx.textAlign = "center";
+  if (colGroup > 1) {
+    for (let c = 0; c < cols; c += colGroup) ctx.fillText(colLabels[c], labW + cw * (c + colGroup / 2), top / 2);
+  } else {
+    const every = cw < 14 ? 3 : 1;
+    for (let c = 0; c < cols; c += every) ctx.fillText(colLabels[c], labW + cw * (c + 0.5), top / 2);
+  }
+  ctx.textAlign = "right";
+  for (let r = 0; r < rows; r++) {
+    const hot = hl && hl.row === r;
+    ctx.fillStyle = cssVar(hot ? "--ink" : "--muted");
+    ctx.fillText(rowLabels[r], labW - 4, top + ch * (r + 0.5));
+    for (let c = 0; c < cols; c++) {
+      ctx.fillStyle = rgba(scaleRgb(M[r * cols + c] / m));
+      ctx.fillRect(labW + cw * c, top + ch * r, cw - 1, ch - 1);
+    }
+  }
+  if (colGroup > 1) {
+    ctx.fillStyle = cssVar("--surface");
+    for (let c = colGroup; c < cols; c += colGroup) ctx.fillRect(labW + cw * c - 1.5, top, 2, rows * ch);
+  }
+  if (hl) {
+    ctx.strokeStyle = cssVar("--accent"); ctx.lineWidth = 2;
+    if (hl.row != null) ctx.strokeRect(labW - 1, top + ch * hl.row - 1, cw * cols + 1, ch + 1);
+    if (hl.col != null) ctx.strokeRect(labW + cw * hl.col - 1, top - 1, cw + 1, ch * rows + 1);
+  }
+  return { max: m, hit: (x, y) => {
+    const c = Math.floor((x - labW) / cw), r = Math.floor((y - top) / ch);
+    return c >= 0 && c < cols && r >= 0 && r < rows ? { r, c, v: M[r * cols + c] } : null;
+  } };
+}
+</script>
+<script>
+// ---- src/evolution.js ----
+// Lernen per Neuroevolution: (1+λ)-Evolutionsstrategie.
+//   1. λ Kinder = Kopien des Elternnetzes, alle Gewichte leicht verändert (Gauss-Rauschen, Stärke sigma)
+//   2. Jedes Kind läuft eine Episode -> Fitness
+//   3. Ist das beste Kind mindestens so gut wie die Eltern, ersetzt es sie, sonst bleiben die Eltern
+//   sigma passt sich an (1/5-Erfolgsregel): bei Erfolg grösser (mutiger), bei Misserfolg kleiner.
+// Mit λ = 1 ist das die einfachste Form ("mutieren, besser -> behalten"). Versuche zeigten aber:
+// λ = 8 und sigma >= 0.05 bleiben viel seltener in einer Sackgasse stecken.
+
+const EPISODE_DEFAULTS = {
+  seconds: 10,            // maximale Dauer
+  world: { slopeDeg: 0 }, // Abweichungen von WORLD_DEFAULTS; Schritt 4: zuerst flach
+  scent: {},              // Abweichungen von SCENT_DEFAULTS
+  start: { x: 0, y: 0, headingDeg: 90 },
+  starts: null,           // mehrere Startrichtungen, z. B. [90, 50, 130]: Fitness = Mittelwert (zwingt zum Duft-Folgen)
+  slipWeight: 1,          // 1: nur der Weg mit haftenden Füssen zählt (Fitness × (1 − Rutschanteil))
+};
+
+const EVOLUTION_DEFAULTS = { lambda: 8, sigma: 0.1, sigmaMin: 0.05, sigmaMax: 0.5 };
+
+// Curriculum: erst flach lernen; erreicht das beste Netz bei allen Starts das Ziel, wird es steiler.
+const CURRICULUM_DEFAULTS = { slope: 0, target: 20, step: 2 };
+
+// Eine Episode ohne Zeichnen. Fitness = wie viel näher die Ameise der Duftquelle gekommen ist (cm);
+// am Ziel: Bonus + gesparte Zeit (je schneller, desto besser). Positive Fitness wird mit
+// (1 − Rutschanteil) gewichtet: Schrubben mit rutschenden Füssen zählt kaum, Stillstehen bringt nichts.
+// (Eine feste Rutsch-Strafe war eine Falle: Zufallsnetze rutschen viel, Stillstehen gewann immer.)
+function runEpisode(net, opts = {}) {
+  const o = { ...EPISODE_DEFAULTS, ...opts };
+  const world = { ...WORLD_DEFAULTS, ...o.world };
+  const scent = { ...SCENT_DEFAULTS, ...o.scent };
+  const ant = createAnt(o.start.x, o.start.y, o.start.headingDeg * DEG);
+  const ctrl = createController(net, { ...BRAIN_DEFAULTS, ...(o.brain || {}) });
+  const dt = PHYSICS_DT, steps = Math.round(o.seconds / dt);
+  const d0 = Math.hypot(ant.x - scent.x, ant.y - scent.y);
+  const trail = o.trail ? [{ x: ant.x, y: ant.y }] : null;
+  let slip = 0, contact = 0, reached = null, t = 0;
+  for (let s = 0; s < steps; s++) {
+    controllerStep(ctrl, ant, senseScent(ant, scent), t);
+    physicsStep(ant, world, dt);
+    t += dt;
+    for (let l = 0; l < 6; l++) { contact += ant.contact[l]; slip += ant.slipping[l]; }
+    if (trail && s % 24 === 0) trail.push({ x: ant.x, y: ant.y });
+    if (ant.y >= scent.y) { reached = t; break; }
+  }
+  const progress = d0 - Math.hypot(ant.x - scent.x, ant.y - scent.y);
+  const slipFrac = contact ? slip / contact : 0;
+  const base = reached !== null ? d0 + 10 + 2 * (o.seconds - reached) : progress;
+  const fitness = base > 0 ? base * (1 - o.slipWeight * slipFrac) : base;
+  return { fitness, progress, reached, seconds: t, slipFrac, x: ant.x, y: ant.y, trail };
+}
+
+// Bewertung über alle Startrichtungen: Mittelwerte; Ziel gilt als erreicht, wenn es bei allen Starts klappt
+function evaluate(net, opts = {}) {
+  const starts = opts.starts && opts.starts.length ? opts.starts : null;
+  if (!starts) { const r = runEpisode(net, opts); return { ...r, reachedCount: r.reached !== null ? 1 : 0, runs: 1 }; }
+  const res = starts.map((h) => runEpisode(net, { ...opts, start: { x: 0, y: 0, headingDeg: h } }));
+  const mean = (k) => res.reduce((a, r) => a + r[k], 0) / res.length;
+  const reachedCount = res.filter((r) => r.reached !== null).length;
+  return {
+    fitness: mean("fitness"), progress: mean("progress"), slipFrac: mean("slipFrac"),
+    reached: reachedCount === res.length ? Math.max(...res.map((r) => r.reached)) : null,
+    reachedCount, runs: res.length, perStart: res,
+  };
+}
+
+function createEvolution(seed, opts = {}) {
+  const p = { ...EVOLUTION_DEFAULTS, ...opts };
+  const parent = opts.parent ? netClone(opts.parent) : createBrain(seed);
+  const evo = {
+    seed, rng: makeRng(seed ^ 0x9e3779b9), parent,
+    lambda: p.lambda, sigma: p.sigma, sigmaMin: p.sigmaMin, sigmaMax: p.sigmaMax,
+    episode: { ...(opts.episode || {}) },
+    curriculum: opts.curriculum ? { ...CURRICULUM_DEFAULTS, ...opts.curriculum } : null,
+    best: null, generation: 0, accepted: 0, episodes: 1,
+    pending: null,         // laufende Generation: bestes Kind bisher und Anzahl gelaufener Kinder
+    history: [],           // pro Generation: Fitness der Eltern und des besten Kindes
+  };
+  if (evo.curriculum) evo.episode.world = { ...(evo.episode.world || {}), slopeDeg: evo.curriculum.slope };
+  evo.best = evaluate(parent, evo.episode);
+  evo.history.push({ gen: 0, episodes: 1, best: evo.best.fitness, child: evo.best.fitness, progress: evo.best.progress, sigma: evo.sigma, ok: true, slope: currentSlope(evo) });
+  return evo;
+}
+
+function currentSlope(evo) {
+  return evo.episode.world && evo.episode.world.slopeDeg != null ? evo.episode.world.slopeDeg : EPISODE_DEFAULTS.world.slopeDeg;
+}
+
+// Nächste Stufe, wenn das beste Netz bei allen Starts oben ankommt. Gibt true zurück, wenn es steiler wurde.
+function curriculumCheck(evo) {
+  const c = evo.curriculum;
+  if (!c || c.slope >= c.target || evo.best.reachedCount < evo.best.runs) return false;
+  c.slope = Math.min(c.target, c.slope + c.step);
+  evo.episode.world = { ...(evo.episode.world || {}), slopeDeg: c.slope };
+  evo.best = evaluate(evo.parent, evo.episode);     // unter den neuen Bedingungen neu bewerten
+  return true;
+}
+
+// Ein Kind laufen lassen. Gibt die abgeschlossene Generation zurück, sobald alle λ Kinder gelaufen sind.
+function evolveTick(evo) {
+  if (!evo.pending) evo.pending = { n: 0, net: null, res: null };
+  const g = evo.pending;
+  const kid = netMutate(netClone(evo.parent), evo.sigma, evo.rng);
+  const r = evaluate(kid, evo.episode);
+  evo.episodes++;
+  if (!g.res || r.fitness > g.res.fitness) { g.net = kid; g.res = r; }
+  if (++g.n < evo.lambda) return null;
+
+  evo.pending = null;
+  evo.generation++;
+  const ok = g.res.fitness >= evo.best.fitness;
+  if (ok) { evo.parent = g.net; evo.best = g.res; evo.accepted++; }
+  evo.sigma *= ok ? Math.exp(0.2) : Math.exp(-0.05);   // Gleichgewicht bei 20 % Erfolg
+  evo.sigma = Math.min(evo.sigmaMax, Math.max(evo.sigmaMin, evo.sigma));
+  const levelUp = curriculumCheck(evo);
+  const h = { gen: evo.generation, episodes: evo.episodes, best: evo.best.fitness, child: g.res.fitness, progress: evo.best.progress, sigma: evo.sigma, ok, slope: currentSlope(evo), levelUp };
+  evo.history.push(h);
+  return h;
+}
+
+// Eine ganze Generation (für Tests und Skripte)
+function evolveStep(evo) {
+  let h = null;
+  while (!h) h = evolveTick(evo);
+  return h;
+}
+
+// ---------- Lernstand speichern / laden ----------
+// Enthält das beste Netz, Zähler, sigma, Curriculum, Lernwelt und die Lernkurve (auf max. 1500 Punkte
+// ausgedünnt). Der Zufallsgenerator wird neu gestartet: Nach dem Laden geht es gleichwertig, aber nicht
+// Bit für Bit identisch weiter.
+const SAVE_FORMAT = "neuronale-ameisen/lernstand-1";
+
+function evoToJSON(evo, extra = {}) {
+  const h = evo.history, maxPts = 1500;
+  const keep = h.length <= maxPts ? h : h.filter((p, i) => i === h.length - 1 || p.ok || p.levelUp || i % Math.ceil(h.length / maxPts) === 0);
+  return {
+    format: SAVE_FORMAT, saved: new Date().toISOString(),
+    seed: evo.seed, generation: evo.generation, accepted: evo.accepted, episodes: evo.episodes,
+    lambda: evo.lambda, sigma: evo.sigma, sigmaMin: evo.sigmaMin,
+    episode: evo.episode, curriculum: evo.curriculum,
+    net: netToJSON(evo.parent),
+    history: keep.map((p) => ({ ...p, best: +p.best.toFixed(4), child: +p.child.toFixed(4), progress: +p.progress.toFixed(3), sigma: +p.sigma.toFixed(4) })),
+    ...extra,
+  };
+}
+
+function evoFromJSON(o) {
+  if (!o || o.format !== SAVE_FORMAT) throw new Error("Keine Lernstand-Datei der Neuronalen Ameisen");
+  const evo = createEvolution(o.seed, {
+    parent: netFromJSON(o.net), lambda: o.lambda, sigma: o.sigma, sigmaMin: o.sigmaMin,
+    episode: o.episode, curriculum: o.curriculum,
+  });
+  evo.rng = makeRng((o.seed ^ o.generation * 2654435761) >>> 0);
+  evo.generation = o.generation; evo.accepted = o.accepted; evo.episodes = o.episodes;
+  evo.history = o.history;
+  return evo;
+}
+</script>
+<script>
+// ---- src/learnview.js ----
+// Lernkurve: x = Bewertungen, Linie = Fitness des besten Netzes, Punkte = bestes Kind jeder Generation.
+// Kinder unter dem sichtbaren Bereich werden am unteren Rand gezeichnet.
+// Mit Curriculum: Neigung als grüne Treppe (rechte Achse, 0 .. Ziel-Neigung), Fitness fällt bei jeder neuen Stufe.
+
+function drawLearnCurve(cv, history, slopeTarget = null) {
+  const { ctx, w, h } = fitCanvas(cv);
+  ctx.clearRect(0, 0, w, h);
+  const padL = 40, padR = slopeTarget ? 34 : 10, padT = 10, padB = 24;
+  const n = history.length;
+  ctx.font = "11px " + cssVar("--font-num"); ctx.fillStyle = cssVar("--muted");
+  if (n < 2) {
+    ctx.textAlign = "center"; ctx.textBaseline = "middle";
+    ctx.fillText("Noch keine Generation – «Lernen starten» drücken", w / 2, h / 2);
+    return;
+  }
+  const xMax = history[n - 1].episodes;
+  let yMax = 1, yMin = 0;
+  for (const p of history) { yMax = Math.max(yMax, p.best); yMin = Math.min(yMin, p.best); }
+  yMax *= 1.1;
+  const X = (e) => padL + (w - padL - padR) * e / xMax;
+  const Y = (v) => padT + (h - padT - padB) * (1 - (Math.max(yMin, Math.min(yMax, v)) - yMin) / (yMax - yMin));
+
+  // Achsen und Gitter
+  ctx.strokeStyle = cssVar("--line"); ctx.lineWidth = 1;
+  ctx.textAlign = "right"; ctx.textBaseline = "middle";
+  const step = niceStep((yMax - yMin) / 4);
+  for (let v = Math.ceil(yMin / step) * step; v <= yMax; v += step) {
+    ctx.beginPath(); ctx.moveTo(padL, Y(v)); ctx.lineTo(w - padR, Y(v)); ctx.stroke();
+    ctx.fillText(+v.toFixed(1), padL - 5, Y(v));
+  }
+  ctx.textAlign = "center"; ctx.textBaseline = "top";
+  const xs = niceStep(xMax / 5);
+  for (let e = 0; e <= xMax; e += xs) ctx.fillText(e, X(e), h - padB + 6);
+
+  // Kinder als Punkte
+  ctx.fillStyle = cssVar("--muted");
+  ctx.globalAlpha = 0.45;
+  for (const p of history) { ctx.beginPath(); ctx.arc(X(p.episodes), Y(p.child), 1.6, 0, 2 * Math.PI); ctx.fill(); }
+  ctx.globalAlpha = 1;
+
+  // Neigung (Curriculum)
+  if (slopeTarget) {
+    const top = Math.max(slopeTarget, ...history.map((p) => p.slope || 0));
+    const YS = (v) => padT + (h - padT - padB) * (1 - v / top);
+    ctx.strokeStyle = cssVar("--goal"); ctx.lineWidth = 1.5; ctx.setLineDash([4, 3]);
+    ctx.beginPath();
+    history.forEach((p, i) => {
+      const v = p.slope || 0;
+      if (i === 0) ctx.moveTo(X(p.episodes), YS(v));
+      else { ctx.lineTo(X(p.episodes), YS(history[i - 1].slope || 0)); ctx.lineTo(X(p.episodes), YS(v)); }
+    });
+    ctx.lineTo(w - padR, YS(history[n - 1].slope || 0));
+    ctx.stroke(); ctx.setLineDash([]);
+    ctx.fillStyle = cssVar("--goal"); ctx.textAlign = "left"; ctx.textBaseline = "middle";
+    for (const v of [0, top / 2, top]) ctx.fillText(Math.round(v) + "°", w - padR + 4, YS(v));
+  }
+
+  // bestes Netz als Treppenlinie
+  ctx.strokeStyle = cssVar("--accent"); ctx.lineWidth = 2;
+  ctx.beginPath();
+  history.forEach((p, i) => {
+    if (i === 0) ctx.moveTo(X(p.episodes), Y(p.best));
+    else { ctx.lineTo(X(p.episodes), Y(history[i - 1].best)); ctx.lineTo(X(p.episodes), Y(p.best)); }
+  });
+  ctx.stroke();
+}
+
+function niceStep(x) {
+  const p = Math.pow(10, Math.floor(Math.log10(Math.max(x, 1e-9))));
+  const m = x / p;
+  return (m < 1.5 ? 1 : m < 3.5 ? 2 : m < 7.5 ? 5 : 10) * p;
+}
+</script>
+<script>
+// ---- src/main.js ----
+// Oberfläche und Simulationsschleife: Physik + Test-Gang (Schritt 1), Duft + Fühler (Schritt 2),
+// Netz + Netz-Anzeige (Schritt 3), Lernen per Neuroevolution (Schritt 4).
+
+const DT = PHYSICS_DT;
+const world = { ...WORLD_DEFAULTS, slopeDeg: 0, scent: { ...SCENT_DEFAULTS }, goalY: SCENT_DEFAULTS.y };
+const gait = { ...GAIT_DEFAULTS };
+const start = { headingDeg: 90 };
+const view = { cx: 0, cy: 0, scale: 120, trail: [], showForces: true, forceScale: 0, sense: true };
+
+let netSeed = 1, ctrl = createController(createBrain(netSeed));
+const netView = { mode: "weights", hover: null, pinned: false };
+let matHover = null;
+
+let ant, sense, simTime, running = true, speed = 1, mode = "gait", follow = true, stopAtGoal = true;
+let goalTime = null, vSmooth = 0, gaitHistory = [], stepCount = 0;
+
+const $ = (id) => document.getElementById(id);
+
+function reset(headingDeg = start.headingDeg) {
+  ant = createAnt(0, 0, headingDeg * DEG);
+  sense = senseScent(ant, world.scent);
+  gait.turn = 0;
+  ctrl.nextT = 0;
+  simTime = 0; goalTime = null; vSmooth = 0; gaitHistory = []; stepCount = 0;
+  view.cx = ant.x; view.cy = ant.y; view.trail = [{ x: 0, y: 0 }];
+}
+
+// ---------- Schieberegler für Welt und Gang ----------
+const SLIDERS = [
+  { obj: world, key: "slopeDeg", label: "Neigung", min: 0, max: 45, step: 1, fmt: (v) => v + "°" },
+  { obj: world, key: "mu", label: "Reibung μ", min: 0.1, max: 1.5, step: 0.05, fmt: (v) => v.toFixed(2) },
+  { obj: gait, key: "freq", label: "Schrittfrequenz", min: 0.5, max: 6, step: 0.1, fmt: (v) => v.toFixed(1) + " Hz", gait: true },
+  { obj: gait, key: "stride", label: "Schrittlänge (halb)", min: 0.05, max: 0.3, step: 0.01, fmt: (v) => v.toFixed(2) + " cm", gait: true },
+  { obj: gait, key: "lift", label: "Hubhöhe Fuss", min: 0, max: 0.3, step: 0.01, fmt: (v) => v.toFixed(2) + " cm", gait: true },
+  { obj: gait, key: "turn", label: "Lenkung (− rechts, + links)", min: -1, max: 1, step: 0.05, fmt: (v) => v.toFixed(2), gait: true, steer: true },
+  { obj: world.scent, key: "x", label: "Duftquelle seitlich", min: -10, max: 10, step: 0.5, fmt: (v) => v.toFixed(1) + " cm" },
+  { obj: world.scent, key: "lambda", label: "Duft-Reichweite λ", min: 3, max: 30, step: 1, fmt: (v) => v + " cm" },
+  { obj: world.scent, key: "noise", label: "Messrauschen Fühler", min: 0, max: 0.3, step: 0.01, fmt: (v) => Math.round(v * 100) + " %" },
+  { obj: start, key: "headingDeg", label: "Startrichtung (setzt zurück)", min: 0, max: 360, step: 15, fmt: (v) => v + "°", onChange: () => reset() },
+];
+// Lern-Einstellungen
+const learn = { on: false, tempo: "fast", evo: null, envKey: "", rate: 0, seconds: 15, lambda: 8, slipWeight: 1,
+  curriculum: true, target: 20, step: 2, starts: 3, demoIdx: 0 };
+const START_SETS = { 1: [90], 3: [90, 50, 130] };
+SLIDERS.push(
+  { box: "learn-sliders", obj: learn, key: "seconds", label: "Episodendauer", min: 3, max: 30, step: 1, fmt: (v) => v + " s" },
+  { box: "learn-sliders", obj: learn, key: "lambda", label: "Varianten pro Generation", min: 1, max: 16, step: 1, fmt: (v) => v,
+    onChange: () => { if (learn.evo) learn.evo.lambda = learn.lambda; $("lr-lambda").textContent = learn.lambda; } },
+  { box: "learn-sliders", obj: learn, key: "slipWeight", label: "Rutschen zählt nicht (Gewichtung)", min: 0, max: 1, step: 0.1, fmt: (v) => Math.round(v * 100) + " %" },
+  { box: "learn-sliders", obj: learn, key: "target", label: "Ziel-Neigung (Curriculum)", min: 2, max: 35, step: 1, fmt: (v) => v + "°", cur: true },
+  { box: "learn-sliders", obj: learn, key: "step", label: "Stufe (Curriculum)", min: 1, max: 6, step: 1, fmt: (v) => "+" + v + "°", cur: true },
+);
+const sliderEls = SLIDERS.map((s) => {
+  const wrap = document.createElement("label");
+  wrap.className = "slider";
+  wrap.innerHTML = `<span>${s.label}</span><output></output><input type="range" min="${s.min}" max="${s.max}" step="${s.step}">`;
+  const inp = wrap.querySelector("input"), out = wrap.querySelector("output");
+  inp.value = s.obj[s.key]; out.textContent = s.fmt(+inp.value);
+  inp.addEventListener("input", () => { s.obj[s.key] = +inp.value; out.textContent = s.fmt(+inp.value); if (s.onChange) s.onChange(); });
+  $(s.box || "sliders").appendChild(wrap);
+  return { s, wrap, inp, out };
+});
+
+// ---------- Gelenk-Tabelle: Anzeige im Gang-Modus, Sollwerte in der Handsteuerung ----------
+const jointInputs = [];
+(() => {
+  const box = $("joints");
+  box.innerHTML = `<span></span>` + JOINT_NAMES.map((n) => `<span class="hd">${n}</span>`).join("");
+  for (let l = 0; l < 6; l++) {
+    const name = document.createElement("span");
+    name.className = "leg"; name.textContent = LEG_NAMES[l];
+    box.appendChild(name);
+    for (let j = 0; j < 3; j++) {
+      const [lo, hi] = JOINT_LIMITS[j];
+      const cell = document.createElement("label");
+      cell.className = "joint";
+      cell.innerHTML = `<input type="range" min="${lo}" max="${hi}" step="1" aria-label="${LEG_NAMES[l]} ${JOINT_NAMES[j]}"><output></output>`;
+      const inp = cell.querySelector("input"), out = cell.querySelector("output");
+      const i = l * 3 + j;
+      inp.addEventListener("input", () => {
+        if (mode !== "hand") return;
+        ant.targets[i] = +inp.value * DEG;
+        if (allLegs.checked) for (let k = 0; k < 6; k++) ant.targets[k * 3 + j] = +inp.value * DEG;
+      });
+      box.appendChild(cell);
+      jointInputs.push({ inp, out });
+    }
+  }
+})();
+const allLegs = (() => {
+  const row = document.createElement("div");
+  row.className = "group";
+  row.innerHTML = `<button>Grundstellung</button><label class="check"><input type="checkbox"> gleiches Gelenk an allen Beinen</label>`;
+  row.querySelector("button").addEventListener("click", () => { for (let l = 0; l < 6; l++) ant.targets.set(NEUTRAL_POSE[l], l * 3); });
+  $("joints").before(row);
+  return row.querySelector("input");
+})();
+
+function updateJointInputs() {
+  for (let i = 0; i < 18; i++) {
+    const { inp, out } = jointInputs[i];
+    const shown = mode === "hand" ? ant.targets[i] : ant.joints[i];
+    if (document.activeElement !== inp) inp.value = Math.round(shown / DEG);
+    out.textContent = Math.round(ant.joints[i] / DEG) + "°";
+    inp.disabled = mode !== "hand";
+  }
+}
+
+// ---------- Bedienung ----------
+function setRunning(on) { running = on; $("run").textContent = running ? "Pause" : goalTime !== null ? "Weiter" : "Start"; }
+$("run").addEventListener("click", () => setRunning(!running));
+$("stop-goal").addEventListener("change", (e) => { stopAtGoal = e.target.checked; });
+$("reset").addEventListener("click", () => { reset(); setRunning(true); });
+$("follow").addEventListener("change", (e) => { follow = e.target.checked; updateSliderStates(); });
+$("forces").addEventListener("change", (e) => { view.showForces = e.target.checked; });
+document.querySelectorAll('input[name="speed"]').forEach((r) => r.addEventListener("change", () => { speed = +r.value; }));
+document.querySelectorAll('input[name="mode"]').forEach((r) => r.addEventListener("change", () => {
+  mode = r.value;
+  if (mode === "hand") ant.targets.set(ant.joints);
+  updateSliderStates();
+}));
+function updateSliderStates() {
+  for (const { s, wrap, inp } of sliderEls) {
+    const off = (s.gait && mode !== "gait") || (s.steer && follow) || (s.cur && !learn.curriculum) ||
+      (s.obj === world && s.key === "slopeDeg" && learn.curriculum && learn.evo);
+    wrap.classList.toggle("off", off); inp.disabled = off;
+  }
+}
+// Lenkregler zeigt im Duft-Modus den aktuellen Wert der Test-Lenkung
+const turnSlider = sliderEls.find((e) => e.s.steer);
+updateSliderStates();
+
+// Zoom mit Mausrad und Zwei-Finger-Geste
+const cv = $("world");
+cv.addEventListener("wheel", (e) => {
+  e.preventDefault();
+  view.scale = Math.min(250, Math.max(15, view.scale * Math.exp(-e.deltaY * 0.0015)));
+}, { passive: false });
+const touches = new Map();
+let pinchStart = null;
+cv.addEventListener("pointerdown", (e) => { touches.set(e.pointerId, e); if (touches.size === 2) pinchStart = { d: pinchDist(), s: view.scale }; });
+cv.addEventListener("pointermove", (e) => {
+  if (!touches.has(e.pointerId)) return;
+  touches.set(e.pointerId, e);
+  if (pinchStart && touches.size === 2) view.scale = Math.min(250, Math.max(15, pinchStart.s * pinchDist() / pinchStart.d));
+});
+for (const ev of ["pointerup", "pointercancel"]) cv.addEventListener(ev, (e) => { touches.delete(e.pointerId); pinchStart = null; });
+function pinchDist() { const [a, b] = [...touches.values()]; return Math.hypot(a.clientX - b.clientX, a.clientY - b.clientY) || 1; }
+
+// ---------- Simulation ----------
+function simStep() {
+  sense = senseScent(ant, world.scent);
+  if (follow) gait.turn = scentSteer(gait.turn, sense, 0.8, DT);
+  if (mode === "gait") tripodTargets(ant, simTime, gait);
+  controllerStep(ctrl, ant, sense, simTime, mode === "net");
+  physicsStep(ant, world, DT);
+  simTime += DT;
+  vSmooth += (ant.vy - vSmooth) * Math.min(1, DT / 0.5);
+  if (goalTime === null && ant.y >= world.goalY) {
+    goalTime = simTime;
+    if (stopAtGoal && !learn.on) setRunning(false);
+  }
+  // Beim Lernen: Vorführung des besten Netzes immer wieder neu starten (mit dem neuesten besten Netz)
+  if (learn.on && mode === "net" && (simTime >= learn.seconds || goalTime !== null)) restartDemo();
+  if (++stepCount % 2 === 0) {
+    gaitHistory.push(Array.from(ant.contact, (c, l) => (c ? (ant.slipping[l] ? 2 : 1) : 0)));
+    if (gaitHistory.length > GAIT_HISTORY) gaitHistory.shift();
+  }
+  if (stepCount % 24 === 0) {
+    view.trail.push({ x: ant.x, y: ant.y });
+    if (view.trail.length > 2000) view.trail.shift();
+  }
+}
+
+let last = performance.now(), acc = 0;
+function frame(now) {
+  const real = Math.min(0.05, (now - last) / 1000);
+  last = now;
+  if (learn.on) learnFrame();
+  if (running) {
+    acc += real * speed;
+    while (running && acc >= DT) { simStep(); acc -= DT; }
+  }
+  view.cx += (ant.x - view.cx) * 0.15;
+  view.cy += (ant.y - view.cy) * 0.15;
+  view.forceScale = 2.5 / (ANT_GEOM.mass * world.g);
+  drawWorld(cv, world, ant, view);
+  drawGait($("gait"), gaitHistory);
+  drawNetPanel();
+  drawLearnPanel();
+  updateStats();
+  updateJointInputs();
+  requestAnimationFrame(frame);
+}
+
+function updateStats() {
+  $("st-t").textContent = simTime.toFixed(1) + " s";
+  $("st-y").textContent = ant.y.toFixed(1) + " cm";
+  $("st-v").textContent = vSmooth.toFixed(2) + " cm/s";
+  $("st-legs").textContent = ant.contact.reduce((a, b) => a + b, 0) + (ant.bellyFrac > 0 ? " (Bauch am Boden)" : "");
+  $("st-slip").textContent = ant.slipping.reduce((a, b) => a + b, 0);
+  $("st-goal").textContent = goalTime !== null ? `erreicht: ${goalTime.toFixed(1)} s` : `${world.goalY} cm`;
+  $("st-goal-box").classList.toggle("win", goalTime !== null);
+
+  // Fühler: Balken = gemessene Konzentration; Richtung: Mitte = geradeaus, links/rechts = Duft von dort
+  $("se-l").style.width = (sense.left * 100).toFixed(1) + "%";
+  $("se-r").style.width = (sense.right * 100).toFixed(1) + "%";
+  $("se-lv").textContent = sense.left.toFixed(3);
+  $("se-rv").textContent = sense.right.toFixed(3);
+  const d = Math.max(-1, Math.min(1, sense.diff));
+  const bar = $("se-d");
+  bar.style.left = (50 - Math.max(0, d) * 50) + "%";
+  bar.style.width = (Math.abs(d) * 50) + "%";
+  $("se-dv").textContent = (sense.diff >= 0 ? "+" : "") + sense.diff.toFixed(2);
+  const dist = Math.hypot(ant.x - world.scent.x, ant.y - world.scent.y);
+  const where = Math.abs(sense.diff) < 0.15 ? "geradeaus (oder genau hinten)" : sense.diff > 0 ? "links" : "rechts";
+  $("se-text").textContent = `Duft kommt von ${where} · Abstand zur Quelle ${dist.toFixed(1)} cm`;
+  if (follow) { turnSlider.inp.value = gait.turn; turnSlider.out.textContent = turnSlider.s.fmt(gait.turn); }
+}
+
+// ---------- Netz-Anzeige ----------
+$("net-new").addEventListener("click", newNet);
+document.querySelectorAll('input[name="lines"]').forEach((r) => r.addEventListener("change", () => {
+  netView.mode = r.value;
+  $("line-what").textContent = r.value === "flow" ? "Signal = Gewicht × Aktivierung der Quelle" : "Gewichte";
+}));
+const netCv = $("net");
+netCv.addEventListener("pointermove", (e) => {
+  if (netView.pinned) return;
+  const b = netCv.getBoundingClientRect();
+  netView.hover = netHit(netView, e.clientX - b.left, e.clientY - b.top);
+});
+netCv.addEventListener("pointerleave", () => { if (!netView.pinned) netView.hover = null; });
+// Antippen/Klicken hält die Auswahl fest, nochmals tippen löst sie
+netCv.addEventListener("click", (e) => {
+  const b = netCv.getBoundingClientRect();
+  const hit = netHit(netView, e.clientX - b.left, e.clientY - b.top);
+  const same = hit && netView.hover && hit.layer === netView.hover.layer && hit.idx === netView.hover.idx && netView.pinned;
+  netView.hover = same ? null : hit;
+  netView.pinned = !!netView.hover;
+});
+const matrices = {};
+for (const id of ["w1", "w2"]) {
+  const cv = $(id);
+  cv.addEventListener("pointermove", (e) => {
+    const b = cv.getBoundingClientRect();
+    const hit = matrices[id] && matrices[id].hit(e.clientX - b.left, e.clientY - b.top);
+    matHover = hit ? { id, ...hit } : null;
+  });
+  cv.addEventListener("pointerleave", () => { matHover = null; });
+}
+
+function drawNetPanel() {
+  const net = ctrl.net, sel = netView.hover;
+  const which = learn.evo ? `bestes Netz nach Generation ${ctrl.gen || 0}` : "Zufallsnetz";
+  $("net-title").textContent = "– " + which + (mode === "net" ? ", steuert die Ameise" : ", rechnet nur mit (Steuerung: " + (mode === "gait" ? "Dreifuss-Gang" : "Hand") + ")");
+  $("net-seed").textContent = `Startwert ${netSeed} · ${netParamCount(net)} Gewichte und Schwellen`;
+  drawNet(netCv, net, netView);
+  $("net-info").textContent = netHoverText(net, sel);
+  const hidLabels = Array.from({ length: net.nHid }, (_, j) => "N" + (j + 1));
+  const hl1 = sel ? (sel.layer === 0 ? { row: sel.idx } : sel.layer === 1 ? { col: sel.idx } : null) : null;
+  const hl2 = sel ? (sel.layer === 1 ? { row: sel.idx } : sel.layer === 2 ? { col: sel.idx } : null) : null;
+  matrices.w1 = drawMatrix($("w1"), net.W1, net.nIn, net.nHid, INPUT_NAMES, hidLabels, hl1);
+  matrices.w2 = drawMatrix($("w2"), net.W2, net.nHid, net.nOut, hidLabels, OUTPUT_NAMES.map((n) => n.split(" ")[0]), hl2, 3);
+  $("w1max").textContent = "Skala ±" + matrices.w1.max.toFixed(2);
+  $("w2max").textContent = "Skala ±" + matrices.w2.max.toFixed(2);
+  if (matHover) {
+    const [rl, cl] = matHover.id === "w1" ? [INPUT_NAMES, hidLabels] : [hidLabels, OUTPUT_NAMES];
+    $("mat-info").textContent = `${matHover.id.toUpperCase()}: ${rl[matHover.r]} → ${(matHover.id === "w2" ? OUTPUT_NAMES : cl)[matHover.c]} = ${matHover.v >= 0 ? "+" : "−"}${Math.abs(matHover.v).toFixed(3)}`;
+  }
+}
+
+// ---------- Lernen ----------
+const LEARN_BUDGET = { watch: 5, fast: 40, turbo: 250 };   // Rechenzeit pro Bild in ms (mind. 1 Episode)
+
+// Lernwelt = die Welt, die oben eingestellt ist; mit Curriculum bestimmt das Lernen die Neigung.
+// Startrichtungen: 1 = wie oben eingestellt, 3 = zusätzlich ±40° daneben
+function learnStarts() {
+  return learn.starts === 1 ? [start.headingDeg] : [start.headingDeg, start.headingDeg - 40, start.headingDeg + 40];
+}
+function learnEpisodeOpts() {
+  return {
+    seconds: learn.seconds, slipWeight: learn.slipWeight,
+    world: { slopeDeg: world.slopeDeg, mu: world.mu }, scent: { ...world.scent },
+    starts: learnStarts(),
+  };
+}
+
+function learnFrame() {
+  if (learn.evo && learn.curriculum) world.slopeDeg = currentSlope(learn.evo);   // Curriculum führt
+  const opts = learnEpisodeOpts(), key = JSON.stringify(opts);
+  if (!learn.evo) {
+    learn.evo = createEvolution(netSeed, { parent: ctrl.net, lambda: learn.lambda, episode: opts,
+      curriculum: learn.curriculum ? { slope: world.slopeDeg, target: learn.target, step: learn.step } : null });
+    updateSliderStates();
+  } else if (key !== learn.envKey) {
+    // Welt oder Regeln geändert: bestes Netz unter den neuen Bedingungen neu bewerten
+    learn.evo.episode = opts; learn.evo.pending = null;
+    learn.evo.best = evaluate(learn.evo.parent, opts);
+  }
+  const c = learn.evo.curriculum;
+  if (c) { c.target = learn.target; c.step = learn.step; }
+  learn.envKey = key;
+  const t0 = performance.now(), budget = LEARN_BUDGET[learn.tempo];
+  let n = 0;
+  do {
+    const h = evolveTick(learn.evo);
+    n += learnStarts().length;
+    if (h && h.levelUp) { world.slopeDeg = h.slope; learn.envKey = JSON.stringify(learnEpisodeOpts()); syncSlider(); }
+  } while (performance.now() - t0 < budget);
+  const dt = (performance.now() - (learn.lastT || t0)) / 1000;
+  learn.lastT = performance.now();
+  if (dt > 0 && dt < 2) learn.rate += (n / dt - learn.rate) * 0.1;
+}
+
+// Vorführung: bestes Netz, reihum aus jeder Startrichtung
+function restartDemo() {
+  ctrl = createController(netClone(learn.evo.parent));
+  ctrl.gen = learn.evo.generation;
+  const starts = learnStarts();
+  reset(starts[learn.demoIdx++ % starts.length]);
+}
+
+function syncSlider() {
+  for (const e of sliderEls) if (e.s.obj === world && e.s.key === "slopeDeg") { e.inp.value = world.slopeDeg; e.out.textContent = e.s.fmt(world.slopeDeg); }
+}
+
+$("cur-on").addEventListener("change", (e) => {
+  learn.curriculum = e.target.checked;
+  if (learn.evo) learn.evo.curriculum = learn.curriculum ? { ...CURRICULUM_DEFAULTS, slope: world.slopeDeg, target: learn.target, step: learn.step } : null;
+  updateSliderStates();
+});
+document.querySelectorAll('input[name="starts"]').forEach((r) => r.addEventListener("change", () => { learn.starts = +r.value; }));
+
+function setLearning(on) {
+  learn.on = on;
+  $("learn").textContent = on ? "Lernen pausieren" : learn.evo ? "Weiter lernen" : "Lernen starten";
+  if (on) {
+    if (mode !== "net") $("m-net").click();
+    learnFrame();
+    restartDemo();
+    setRunning(true);
+  } else if (learn.evo) {
+    restartDemo();
+    autoSave();
+  }
+}
+$("learn").addEventListener("click", () => setLearning(!learn.on));
+$("learn-reset").addEventListener("click", newNet);
+document.querySelectorAll('input[name="tempo"]').forEach((r) => r.addEventListener("change", () => { learn.tempo = r.value; learn.rate = 0; }));
+
+// Neues Zufallsnetz: Lernen beginnt von vorn
+function newNet() {
+  netSeed = 1 + Math.floor(Math.random() * 99999);
+  ctrl = createController(createBrain(netSeed));
+  learn.evo = null; learn.envKey = ""; learn.rate = 0; learn.demoIdx = 0;
+  try { localStorage.removeItem(STORE_KEY); } catch (e) { /* egal */ }
+  $("lr-store").textContent = "Neues Zufallsnetz – der Lernstand wird automatisch in diesem Browser gesichert.";
+  if (learn.curriculum) { world.slopeDeg = 0; syncSlider(); }
+  setLearning(false);
+  updateSliderStates();
+  reset();
+}
+
+function drawLearnPanel() {
+  const e = learn.evo;
+  drawLearnCurve($("curve"), e ? e.history : [], e && e.curriculum ? e.curriculum.target : null);
+  $("lr-title").textContent = e ? `– Startnetz ${netSeed}` + (learn.on ? `, lernt (${learn.tempo === "turbo" ? "Turbo" : learn.tempo})` : ", pausiert") : "";
+  $("lr-gen").textContent = e ? e.generation : 0;
+  $("lr-eps").textContent = e ? e.episodes * (e.best.runs || 1) : 0;
+  $("lr-rate").textContent = learn.on && learn.rate ? Math.round(learn.rate) : "–";
+  const c = e && e.curriculum;
+  $("lr-slope").textContent = e ? (c ? `${currentSlope(e)}° von ${c.target}°` : `${currentSlope(e)}°`) : "–";
+  $("lr-slope-box").classList.toggle("win", !!(c && currentSlope(e) >= c.target && e.best.reachedCount === e.best.runs));
+  $("lr-weg").textContent = e ? e.best.progress.toFixed(1) + " cm" : "–";
+  $("lr-slip").textContent = e ? Math.round(100 * e.best.slipFrac) + " %" : "–";
+  $("lr-sigma").textContent = e ? `${e.sigma.toFixed(2)} · ${e.generation ? Math.round(100 * e.accepted / e.generation) : 0}%` : "–";
+  $("lr-goal").textContent = !e ? "–" : `${e.best.reachedCount}/${e.best.runs}` + (e.best.reached !== null ? ` in ${e.best.reached.toFixed(1)} s` : "");
+  $("lr-goal-box").classList.toggle("win", !!(e && e.best.reached !== null));
+}
+
+// ---------- Lernstand sichern ----------
+// Automatisch im Browser (localStorage, alle 5 s beim Lernen und beim Pausieren) und als Datei.
+const STORE_KEY = "neuronale-ameisen-lernstand";
+const UI_KEYS = ["seconds", "lambda", "slipWeight", "curriculum", "target", "step", "starts"];
+
+function saveState() {
+  return evoToJSON(learn.evo, { netSeed, ui: Object.fromEntries(UI_KEYS.map((k) => [k, learn[k]])), mu: world.mu });
+}
+function autoSave() {
+  if (!learn.evo) return;
+  try {
+    localStorage.setItem(STORE_KEY, JSON.stringify(saveState()));
+    $("lr-store").textContent = `Lernstand im Browser gesichert (${new Date().toLocaleTimeString("de-CH")}). Beim nächsten Öffnen geht es hier weiter.`;
+  } catch (e) {
+    $("lr-store").textContent = "Automatisches Sichern im Browser nicht möglich – «Speichern (.json)» benutzen.";
+  }
+}
+setInterval(() => { if (learn.on) autoSave(); }, 5000);
+
+function applyState(o, source) {
+  const evo = evoFromJSON(o);
+  learn.on = false;
+  learn.evo = evo;
+  netSeed = o.netSeed || evo.seed;
+  if (o.ui) for (const k of UI_KEYS) if (k in o.ui) learn[k] = o.ui[k];
+  if (o.mu) world.mu = o.mu;
+  if (evo.episode.scent) Object.assign(world.scent, evo.episode.scent);
+  if (evo.episode.starts) start.headingDeg = evo.episode.starts[0];
+  world.slopeDeg = currentSlope(evo);
+  learn.envKey = JSON.stringify(learnEpisodeOpts());
+  evo.episode = learnEpisodeOpts();
+  // Bedienelemente nachführen
+  for (const e of sliderEls) { e.inp.value = e.s.obj[e.s.key]; e.out.textContent = e.s.fmt(e.s.obj[e.s.key]); }
+  $("cur-on").checked = learn.curriculum;
+  $("st-" + learn.starts).checked = true;
+  $("lr-lambda").textContent = learn.lambda;
+  if (mode !== "net") $("m-net").click();
+  setLearning(false);
+  updateSliderStates();
+  const when = new Date(o.saved).toLocaleString("de-CH");
+  $("lr-store").textContent = `${source}: Lernstand vom ${when}, Generation ${evo.generation}, Neigung ${currentSlope(evo)}°. «Weiter lernen» setzt fort.`;
+}
+
+$("save").addEventListener("click", () => {
+  if (!learn.evo) { $("lr-store").textContent = "Noch nichts gelernt – zuerst «Lernen starten»."; return; }
+  const blob = new Blob([JSON.stringify(saveState())], { type: "application/json" });
+  const a = document.createElement("a");
+  a.href = URL.createObjectURL(blob);
+  a.download = `ameise-gen${learn.evo.generation}-${currentSlope(learn.evo)}grad.json`;
+  a.click();
+  setTimeout(() => URL.revokeObjectURL(a.href), 1000);
+  autoSave();
+});
+$("load").addEventListener("click", () => $("load-file").click());
+$("load-file").addEventListener("change", (e) => {
+  const f = e.target.files[0];
+  if (!f) return;
+  f.text().then((t) => applyState(JSON.parse(t), `Geladen aus ${f.name}`))
+    .catch((err) => { $("lr-store").textContent = "Laden fehlgeschlagen: " + err.message; });
+  e.target.value = "";
+});
+
+reset();
+try {
+  const saved = localStorage.getItem(STORE_KEY);
+  if (saved) applyState(JSON.parse(saved), "Aus dem Browser");
+} catch (e) { /* kein Speicher oder alter Stand: frisch beginnen */ }
+requestAnimationFrame(frame);
+</script>
+<script>
+// Offline: Service Worker nur über https oder localhost (bei file:// geht es auch ohne)
+if ("serviceWorker" in navigator && (location.protocol === "https:" || location.hostname === "localhost")) {
+  navigator.serviceWorker.register("sw.js");
+}
+</script>
+</body>
+</html>

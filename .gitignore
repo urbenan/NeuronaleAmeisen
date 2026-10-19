@@ -1,0 +1,4 @@
+__pycache__/
+*.pyc
+# gelernte Netze / Lernstände (Export aus der Seite)
+ameise-gen*.json
