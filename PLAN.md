@@ -45,3 +45,7 @@ hinauf zu laufen und einem Duftgradienten zu folgen. Läuft im Browser (2D von o
 - Ergebnis: 8 Individuen mit eigenem Gangstil, alle 100 % oben bei 0°–25° (3 Startrichtungen).
 - Der Gang ist empfindlich: Mutation σ 0.01 senkt den Erfolg auf ~70 %. Evolution danach nur mit
   sehr feiner Mutation (σ ≈ 0.004).
+- Evolution nach dem Nachahmen (σ 0.004, Steigungssinn, Neigungsmix, Curriculum bis 34°, 30 000 Episoden):
+  keine Verbesserung. Beste nachgeahmte Individuen schaffen bereits 30° (3/3 Starts), eines 32°;
+  die besten nach der Evolution nur 30°, ab 35° keine. Startkolonie war allerdings noch mit σ 0.02
+  mutiert (22 von 24 Starts beschädigt) – ein sauberer Neuversuch steht aus.
