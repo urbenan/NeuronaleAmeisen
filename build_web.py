@@ -5,7 +5,9 @@ Aufruf:
 
 Ergebnis im Ordner web/:
     index.html            eigenständige Seite (alle Skripte aus src/ eingebettet, keine externen Dateien)
-    manifest.webmanifest  App-Manifest ("Zum Home-Bildschirm")
+    viewer.html           Vollbild-Viewer fürs iPhone (Neigung per Lagesensor), mit eingebauter
+                          trainierter Kolonie aus trained/kolonie.json (falls vorhanden)
+    manifest.webmanifest, manifest-viewer.webmanifest  App-Manifeste ("Zum Home-Bildschirm")
     sw.js                 Service Worker: Seite offline aus dem Cache laden (nur über https/localhost)
     icon-180.png, icon-512.png
 
@@ -23,14 +25,17 @@ import zlib
 HERE = os.path.dirname(os.path.abspath(__file__))
 WEB = os.path.join(HERE, "web")
 
-HEAD_EXTRA = """<meta name="apple-mobile-web-app-capable" content="yes">
+def head_extra(title, manifest, status="default"):
+    return f"""<meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="mobile-web-app-capable" content="yes">
-<meta name="apple-mobile-web-app-title" content="Ameisen">
-<meta name="apple-mobile-web-app-status-bar-style" content="default">
+<meta name="apple-mobile-web-app-title" content="{title}">
+<meta name="apple-mobile-web-app-status-bar-style" content="{status}">
 <meta name="theme-color" content="#1f4e79">
-<link rel="manifest" href="manifest.webmanifest">
+<link rel="manifest" href="{manifest}">
 <link rel="apple-touch-icon" href="icon-180.png">
 """
+
+TRAINED = os.path.join(HERE, "trained", "kolonie.json")
 
 SW_REGISTER = """<script>
 // Offline: Service Worker nur über https oder localhost (bei file:// geht es auch ohne)
@@ -97,32 +102,54 @@ def ant_icon(size):
             + chunk(b"IDAT", raw) + chunk(b"IEND", b""))
 
 
-def main():
-    os.makedirs(WEB, exist_ok=True)
-    with open(os.path.join(HERE, "index.html"), encoding="utf-8") as f:
+def build_page(src_name, out_name, head, embed=None):
+    with open(os.path.join(HERE, src_name), encoding="utf-8") as f:
         page = f.read()
     page, n = inline_scripts(page)
-    page = page.replace("</title>\n", "</title>\n" + HEAD_EXTRA, 1)
+    page = page.replace("</title>\n", "</title>\n" + head, 1)
     page = page.replace("</body>", SW_REGISTER + "</body>", 1)
-    with open(os.path.join(WEB, "index.html"), "w", encoding="utf-8") as f:
+    if embed is not None:
+        marker = "/*__TRAINED__*/null"
+        if marker not in page:
+            raise SystemExit(f"{src_name}: Platzhalter {marker} fehlt")
+        page = page.replace(marker, embed, 1)
+    with open(os.path.join(WEB, out_name), "w", encoding="utf-8") as f:
         f.write(page)
+    return page, n
 
-    for size in (180, 512):
-        with open(os.path.join(WEB, f"icon-{size}.png"), "wb") as f:
-            f.write(ant_icon(size))
-    manifest = {
-        "name": "Neuronale Ameisen", "short_name": "Ameisen", "lang": "de",
-        "start_url": "./", "scope": "./", "display": "standalone",
+
+def manifest(name, short, start):
+    return {
+        "name": name, "short_name": short, "lang": "de",
+        "start_url": start, "scope": "./", "display": "standalone", "orientation": "portrait",
         "background_color": "#eef1f4", "theme_color": "#1f4e79",
         "icons": [{"src": "icon-180.png", "sizes": "180x180", "type": "image/png"},
                   {"src": "icon-512.png", "sizes": "512x512", "type": "image/png"}],
     }
-    with open(os.path.join(WEB, "manifest.webmanifest"), "w", encoding="utf-8") as f:
-        json.dump(manifest, f, ensure_ascii=False, indent=2)
-    version = hashlib.sha1(page.encode()).hexdigest()[:10]
+
+
+def main():
+    os.makedirs(WEB, exist_ok=True)
+    page, n = build_page("index.html", "index.html", head_extra("Ameisen", "manifest.webmanifest"))
+    trained = None
+    if os.path.exists(TRAINED):
+        with open(TRAINED, encoding="utf-8") as f:
+            trained = json.dumps(json.load(f), separators=(",", ":"))
+    viewer, nv = build_page("viewer.html", "viewer.html",
+                            head_extra("Ameisen-Viewer", "manifest-viewer.webmanifest", "black-translucent"),
+                            embed=trained or "null")
+
+    for size in (180, 512):
+        with open(os.path.join(WEB, f"icon-{size}.png"), "wb") as f:
+            f.write(ant_icon(size))
+    for fname, m in (("manifest.webmanifest", manifest("Neuronale Ameisen", "Ameisen", "./")),
+                     ("manifest-viewer.webmanifest", manifest("Ameisen-Viewer", "Ameisen-Viewer", "viewer.html"))):
+        with open(os.path.join(WEB, fname), "w", encoding="utf-8") as f:
+            json.dump(m, f, ensure_ascii=False, indent=2)
+    version = hashlib.sha1((page + viewer).encode()).hexdigest()[:10]
     sw = f"""// Service Worker: alle Dateien beim ersten Besuch speichern, danach offline aus dem Cache
 const CACHE = "ameisen-{version}";
-const FILES = ["./", "index.html", "manifest.webmanifest", "icon-180.png", "icon-512.png"];
+const FILES = ["./", "index.html", "viewer.html", "manifest.webmanifest", "manifest-viewer.webmanifest", "icon-180.png", "icon-512.png"];
 self.addEventListener("install", (e) => {{ e.waitUntil(caches.open(CACHE).then((c) => c.addAll(FILES))); self.skipWaiting(); }});
 self.addEventListener("activate", (e) => {{
   e.waitUntil(caches.keys().then((ks) => Promise.all(ks.filter((k) => k !== CACHE).map((k) => caches.delete(k)))));
@@ -134,7 +161,10 @@ self.addEventListener("fetch", (e) => {{
 """
     with open(os.path.join(WEB, "sw.js"), "w", encoding="utf-8") as f:
         f.write(sw)
-    print(f"web/index.html erzeugt ({n} Skripte eingebettet, {len(page) // 1024} KB), Cache-Version {version}")
+    print(f"web/index.html erzeugt ({n} Skripte eingebettet, {len(page) // 1024} KB)")
+    print(f"web/viewer.html erzeugt ({nv} Skripte, {len(viewer) // 1024} KB, "
+          f"{'mit trainierter Kolonie' if trained else 'OHNE trainierte Kolonie (trained/kolonie.json fehlt)'})")
+    print(f"Cache-Version {version}")
 
 
 if __name__ == "__main__":

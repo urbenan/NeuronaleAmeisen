@@ -6,13 +6,14 @@ und dabei dem Duft zu folgen – direkt im Browser, ohne Server.
 - Körper aus 3 Massenpunkten, 6 zweiteilige Beine mit je 3 Gelenken (α drehen, β heben, γ Knie), 2 Fühler
 - Physik: Reibung an den Füssen mit Bodenkontakt (Haften/Gleiten, elastische Beine), Hangabtrieb
 - Netz 28 → 16 → 18 (tanh), wie beim Ziffern-Projekt sichtbar: Topologie, Gewichte, Live-Aktivierungen
-- Lernen: (1+λ)-Evolutionsstrategie, Curriculum von flach bis 20°, 3 Startrichtungen
+- Lernen wahlweise als **Kolonie** (24 Ameisen, je eigenes Netz, genetischer Algorithmus mit Kreuzung ganzer
+  Neuronen) oder als **eine Ameise** ((1+λ)-Evolutionsstrategie); Curriculum von flach bis 20°, 3 Startrichtungen
 
 ## Benutzen
 
 - **Entwickeln:** `index.html` im Browser öffnen (lädt die Skripte aus `src/` einzeln)
 - **Eine Datei / offline:** `python3 build_web.py` erzeugt `web/` (alles eingebettet, Manifest, Service Worker, Icons)
-- **Tests:** `for t in test/test_*.js; do node $t; done` (Physik, Duft, Netz, Lernen; ca. 1 Minute)
+- **Tests:** `for t in test/test_*.js; do node $t; done` (Physik, Duft, Netz, Lernen, Kolonie; ca. 1–2 Minuten)
 
 Der Lernstand wird automatisch im Browser gesichert; mit «Speichern (.json)» / «Laden (.json)» lässt er
 sich als Datei sichern und auf einem anderen Gerät weiterführen.
@@ -28,5 +29,6 @@ sich als Datei sichern und auf einem anderen Gerät weiterführen.
 | `src/nn.js` | 3-Schicht-Netz, Mutation, Speichern |
 | `src/brain.js` | Sensoren → Netz → Gelenke (60 Hz, träge Muskeln) |
 | `src/evolution.js` | Episoden, Fitness, (1+λ)-ES, Curriculum, Lernstand |
+| `src/ga.js` | Kolonie: Elite, Turnier, Kreuzung ganzer Neuronen, Mutation, Speichern |
 | `src/render.js`, `netview.js`, `learnview.js`, `main.js` | Zeichnen und Bedienung |
 | `PLAN.md` | Plan und Erkenntnisse |

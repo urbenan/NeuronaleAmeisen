@@ -4,7 +4,7 @@ const fs = require("fs");
 const path = require("path");
 const vm = require("vm");
 
-const SRC = ["ant.js", "physics.js", "gait.js", "scent.js", "nn.js", "brain.js", "evolution.js"];
+const SRC = ["ant.js", "physics.js", "gait.js", "scent.js", "nn.js", "brain.js", "evolution.js", "ga.js"];
 const ctx = globalThis;
 for (const f of SRC) vm.runInThisContext(fs.readFileSync(path.join(__dirname, "..", "src", f), "utf8"), { filename: f });
 const S = (code) => vm.runInThisContext(code);

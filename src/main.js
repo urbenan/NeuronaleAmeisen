@@ -1,5 +1,5 @@
 // Oberfläche und Simulationsschleife: Physik + Test-Gang (Schritt 1), Duft + Fühler (Schritt 2),
-// Netz + Netz-Anzeige (Schritt 3), Lernen per Neuroevolution (Schritt 4).
+// Netz + Netz-Anzeige (Schritt 3), Lernen per Neuroevolution (Schritt 4–6), Kolonie (Schritt 7).
 
 const DT = PHYSICS_DT;
 const world = { ...WORLD_DEFAULTS, slopeDeg: 0, scent: { ...SCENT_DEFAULTS }, goalY: SCENT_DEFAULTS.y };
@@ -8,6 +8,8 @@ const start = { headingDeg: 90 };
 const view = { cx: 0, cy: 0, scale: 120, trail: [], showForces: true, forceScale: 0, sense: true };
 
 let netSeed = 1, ctrl = createController(createBrain(netSeed));
+// Kolonie-Vorführung: die gewählte Ameise ist `ant`/`ctrl`, alle anderen laufen in `swarm` mit
+let swarm = [], selected = null;   // selected = { id, rank }
 const netView = { mode: "weights", hover: null, pinned: false };
 let matHover = null;
 
@@ -40,12 +42,19 @@ const SLIDERS = [
 ];
 // Lern-Einstellungen
 const learn = { on: false, tempo: "fast", evo: null, envKey: "", rate: 0, seconds: 15, lambda: 8, slipWeight: 1,
-  curriculum: true, target: 20, step: 2, starts: 3, demoIdx: 0 };
+  curriculum: true, target: 20, step: 2, starts: 3, demoIdx: 0,
+  method: "colony", size: GA_DEFAULTS.size, gaSigma: GA_DEFAULTS.sigma, crossover: GA_DEFAULTS.crossover };
 const START_SETS = { 1: [90], 3: [90, 50, 130] };
 SLIDERS.push(
   { box: "learn-sliders", obj: learn, key: "seconds", label: "Episodendauer", min: 3, max: 30, step: 1, fmt: (v) => v + " s" },
-  { box: "learn-sliders", obj: learn, key: "lambda", label: "Varianten pro Generation", min: 1, max: 16, step: 1, fmt: (v) => v,
-    onChange: () => { if (learn.evo) learn.evo.lambda = learn.lambda; $("lr-lambda").textContent = learn.lambda; } },
+  { box: "learn-sliders", obj: learn, key: "lambda", label: "Varianten pro Generation", min: 1, max: 16, step: 1, fmt: (v) => v, single: true,
+    onChange: () => { if (learn.evo && learn.evo.kind !== "colony") learn.evo.lambda = learn.lambda; methodText(); } },
+  { box: "learn-sliders", obj: learn, key: "size", label: "Ameisen in der Kolonie", min: 8, max: 48, step: 4, fmt: (v) => v, colony: true,
+    onChange: () => { if (learn.evo && learn.evo.kind === "colony") learn.evo.size = learn.size; methodText(); } },
+  { box: "learn-sliders", obj: learn, key: "gaSigma", label: "Mutation σ", min: 0.01, max: 0.2, step: 0.01, fmt: (v) => v.toFixed(2), colony: true,
+    onChange: () => { if (learn.evo && learn.evo.kind === "colony") learn.evo.sigma = learn.gaSigma; } },
+  { box: "learn-sliders", obj: learn, key: "crossover", label: "Kinder aus zwei Eltern", min: 0, max: 1, step: 0.1, fmt: (v) => Math.round(v * 100) + " %", colony: true,
+    onChange: () => { if (learn.evo && learn.evo.kind === "colony") learn.evo.crossover = learn.crossover; methodText(); } },
   { box: "learn-sliders", obj: learn, key: "slipWeight", label: "Rutschen zählt nicht (Gewichtung)", min: 0, max: 1, step: 0.1, fmt: (v) => Math.round(v * 100) + " %" },
   { box: "learn-sliders", obj: learn, key: "target", label: "Ziel-Neigung (Curriculum)", min: 2, max: 35, step: 1, fmt: (v) => v + "°", cur: true },
   { box: "learn-sliders", obj: learn, key: "step", label: "Stufe (Curriculum)", min: 1, max: 6, step: 1, fmt: (v) => "+" + v + "°", cur: true },
@@ -124,6 +133,7 @@ function updateSliderStates() {
     const off = (s.gait && mode !== "gait") || (s.steer && follow) || (s.cur && !learn.curriculum) ||
       (s.obj === world && s.key === "slopeDeg" && learn.curriculum && learn.evo);
     wrap.classList.toggle("off", off); inp.disabled = off;
+    wrap.hidden = (s.single && learn.method === "colony") || (s.colony && learn.method !== "colony");
   }
 }
 // Lenkregler zeigt im Duft-Modus den aktuellen Wert der Test-Lenkung
@@ -154,6 +164,10 @@ function simStep() {
   if (mode === "gait") tripodTargets(ant, simTime, gait);
   controllerStep(ctrl, ant, sense, simTime, mode === "net");
   physicsStep(ant, world, DT);
+  if (mode === "net") for (const m of swarm) {
+    controllerStep(m.ctrl, m.ant, senseScent(m.ant, world.scent), simTime);
+    physicsStep(m.ant, world, DT);
+  }
   simTime += DT;
   vSmooth += (ant.vy - vSmooth) * Math.min(1, DT / 0.5);
   if (goalTime === null && ant.y >= world.goalY) {
@@ -184,6 +198,7 @@ function frame(now) {
   view.cx += (ant.x - view.cx) * 0.15;
   view.cy += (ant.y - view.cy) * 0.15;
   view.forceScale = 2.5 / (ANT_GEOM.mass * world.g);
+  view.swarm = mode === "net" ? swarm : [];
   drawWorld(cv, world, ant, view);
   drawGait($("gait"), gaitHistory);
   drawNetPanel();
@@ -252,7 +267,8 @@ for (const id of ["w1", "w2"]) {
 
 function drawNetPanel() {
   const net = ctrl.net, sel = netView.hover;
-  const which = learn.evo ? `bestes Netz nach Generation ${ctrl.gen || 0}` : "Zufallsnetz";
+  const which = isColony(learn.evo) && ctrl.id ? `Ameise #${ctrl.id} (Rang ${ctrl.rank} von ${swarm.length + 1}, Generation ${ctrl.gen})`
+    : learn.evo ? `bestes Netz nach Generation ${ctrl.gen || 0}` : "Zufallsnetz";
   $("net-title").textContent = "– " + which + (mode === "net" ? ", steuert die Ameise" : ", rechnet nur mit (Steuerung: " + (mode === "gait" ? "Dreifuss-Gang" : "Hand") + ")");
   $("net-seed").textContent = `Startwert ${netSeed} · ${netParamCount(net)} Gewichte und Schwellen`;
   drawNet(netCv, net, netView);
@@ -286,17 +302,30 @@ function learnEpisodeOpts() {
   };
 }
 
+// Zwei Lernarten mit gleicher Schnittstelle: eine Ameise ((1+λ)-ES, evolution.js) oder Kolonie (GA, ga.js)
+const isColony = (L) => L && L.kind === "colony";
+function learnerTick(L) { return isColony(L) ? colonyTick(L) : evolveTick(L); }
+function learnerBestNet(L) { return isColony(L) ? (L.bestNet || L.members[0].net) : L.parent; }
+
+function createLearner(opts) {
+  const curriculum = learn.curriculum ? { slope: world.slopeDeg, target: learn.target, step: learn.step } : null;
+  if (learn.method === "colony") {
+    return createColony(netSeed, { size: learn.size, sigma: learn.gaSigma, crossover: learn.crossover, episode: opts, curriculum });
+  }
+  return createEvolution(netSeed, { parent: ctrl.net, lambda: learn.lambda, episode: opts, curriculum });
+}
+
 function learnFrame() {
   if (learn.evo && learn.curriculum) world.slopeDeg = currentSlope(learn.evo);   // Curriculum führt
   const opts = learnEpisodeOpts(), key = JSON.stringify(opts);
   if (!learn.evo) {
-    learn.evo = createEvolution(netSeed, { parent: ctrl.net, lambda: learn.lambda, episode: opts,
-      curriculum: learn.curriculum ? { slope: world.slopeDeg, target: learn.target, step: learn.step } : null });
+    learn.evo = createLearner(opts);
     updateSliderStates();
   } else if (key !== learn.envKey) {
-    // Welt oder Regeln geändert: bestes Netz unter den neuen Bedingungen neu bewerten
-    learn.evo.episode = opts; learn.evo.pending = null;
-    learn.evo.best = evaluate(learn.evo.parent, opts);
+    // Welt oder Regeln geändert: unter den neuen Bedingungen neu bewerten
+    learn.evo.episode = opts;
+    if (isColony(learn.evo)) { for (const m of learn.evo.members) m.res = null; learn.evo.cursor = 0; }
+    else { learn.evo.pending = null; learn.evo.best = evaluate(learn.evo.parent, opts); }
   }
   const c = learn.evo.curriculum;
   if (c) { c.target = learn.target; c.step = learn.step; }
@@ -304,7 +333,7 @@ function learnFrame() {
   const t0 = performance.now(), budget = LEARN_BUDGET[learn.tempo];
   let n = 0;
   do {
-    const h = evolveTick(learn.evo);
+    const h = learnerTick(learn.evo);
     n += learnStarts().length;
     if (h && h.levelUp) { world.slopeDeg = h.slope; learn.envKey = JSON.stringify(learnEpisodeOpts()); syncSlider(); }
   } while (performance.now() - t0 < budget);
@@ -313,13 +342,68 @@ function learnFrame() {
   if (dt > 0 && dt < 2) learn.rate += (n / dt - learn.rate) * 0.1;
 }
 
-// Vorführung: bestes Netz, reihum aus jeder Startrichtung
+// Vorführung, reihum aus jeder Startrichtung. Eine Ameise: das beste Netz.
+// Kolonie: alle Ameisen der zuletzt fertigen Generation gleichzeitig; gewählt ist die beste
+// (oder die angeklickte, solange sie noch lebt).
 function restartDemo() {
-  ctrl = createController(netClone(learn.evo.parent));
-  ctrl.gen = learn.evo.generation;
-  const starts = learnStarts();
-  reset(starts[learn.demoIdx++ % starts.length]);
+  const L = learn.evo, starts = learnStarts();
+  const heading = starts[learn.demoIdx++ % starts.length];
+  reset(heading);
+  swarm = [];
+  if (!isColony(L)) {
+    ctrl = createController(netClone(L.parent));
+    ctrl.gen = L.generation;
+    selected = null;
+    return;
+  }
+  const list = L.shown || L.members.map((m, i) => ({ id: m.id, rank: i + 1, net: m.net, res: null, parents: m.parents }));
+  const keep = selected && list.find((m) => m.id === selected.id);
+  const pick = keep || list[0];
+  for (const m of list) {
+    const c = createController(netClone(m.net));
+    Object.assign(c, { gen: L.generation, id: m.id, rank: m.rank, res: m.res, parents: m.parents });
+    if (m === pick) { ctrl = c; selected = { id: m.id, rank: m.rank }; }
+    else swarm.push({ ant: createAnt(0, 0, heading * DEG), ctrl: c });
+  }
 }
+
+// Ameise in der Welt anklicken -> wird die gewählte (Kennzahlen, Fühler, Gangbild, Netz)
+function selectAntAt(px, py) {
+  if (!swarm.length) return;
+  const w = cv.clientWidth, h = cv.clientHeight;
+  const wx = view.cx + (px - w / 2) / view.scale, wy = view.cy - (py - h / 2) / view.scale;
+  let best = null, bd = 1.2;   // cm
+  for (const m of swarm) {
+    const d = Math.hypot(m.ant.x - wx, m.ant.y - wy);
+    if (d < bd) { bd = d; best = m; }
+  }
+  if (!best) return;
+  swarm.splice(swarm.indexOf(best), 1, { ant, ctrl });
+  ant = best.ant; ctrl = best.ctrl;
+  selected = { id: ctrl.id, rank: ctrl.rank };
+  view.trail = [{ x: ant.x, y: ant.y }]; gaitHistory = [];
+  netView.hover = null; netView.pinned = false;
+}
+let downAt = null;
+cv.addEventListener("pointerdown", (e) => { downAt = { x: e.clientX, y: e.clientY }; });
+cv.addEventListener("pointerup", (e) => {
+  if (!downAt || Math.hypot(e.clientX - downAt.x, e.clientY - downAt.y) > 6 || touches.size > 0) return;
+  const b = cv.getBoundingClientRect();
+  selectAntAt(e.clientX - b.left, e.clientY - b.top);
+});
+
+function methodText() {
+  $("method-text").innerHTML = learn.method === "colony"
+    ? `<b>Kolonie:</b> ${learn.size} Ameisen, jede mit eigenem Netz. Nach jeder Generation kommen die besten ${GA_DEFAULTS.elite} unverändert weiter. Die übrigen Plätze füllen Kinder: Eltern per Turnier (die beste von ${GA_DEFAULTS.tournament} zufälligen), ${Math.round(learn.crossover * 100)} % aus zwei Eltern – jedes verborgene Neuron samt seinen Gewichten kommt ganz von Mutter oder Vater – danach Mutation σ.`
+    : `<b>Eine Ameise:</b> Pro Generation entstehen ${learn.lambda} Varianten des besten Netzes (alle Gewichte um σ zufällig verändert). Ist die beste mindestens so gut, wird sie das neue beste Netz.`;
+  $("dots-what").textContent = learn.method === "colony" ? "Median der Kolonie" : "bester Versuch einer Generation";
+}
+document.querySelectorAll('input[name="method"]').forEach((r) => r.addEventListener("change", () => {
+  learn.method = r.value;
+  methodText();
+  newNet();   // andere Lernart: von vorn beginnen
+}));
+methodText();
 
 function syncSlider() {
   for (const e of sliderEls) if (e.s.obj === world && e.s.key === "slopeDeg") { e.inp.value = world.slopeDeg; e.out.textContent = e.s.fmt(world.slopeDeg); }
@@ -354,6 +438,7 @@ function newNet() {
   netSeed = 1 + Math.floor(Math.random() * 99999);
   ctrl = createController(createBrain(netSeed));
   learn.evo = null; learn.envKey = ""; learn.rate = 0; learn.demoIdx = 0;
+  swarm = []; selected = null;
   try { localStorage.removeItem(STORE_KEY); } catch (e) { /* egal */ }
   $("lr-store").textContent = "Neues Zufallsnetz – der Lernstand wird automatisch in diesem Browser gesichert.";
   if (learn.curriculum) { world.slopeDeg = 0; syncSlider(); }
@@ -364,6 +449,12 @@ function newNet() {
 
 function drawLearnPanel() {
   const e = learn.evo;
+  drawSwarmInfo();
+  if (e && !e.best) {   // Kolonie vor der ersten fertigen Generation
+    drawLearnCurve($("curve"), [], null);
+    $("lr-gen").textContent = 0; $("lr-eps").textContent = e.episodes * learnStarts().length;
+    return;
+  }
   drawLearnCurve($("curve"), e ? e.history : [], e && e.curriculum ? e.curriculum.target : null);
   $("lr-title").textContent = e ? `– Startnetz ${netSeed}` + (learn.on ? `, lernt (${learn.tempo === "turbo" ? "Turbo" : learn.tempo})` : ", pausiert") : "";
   $("lr-gen").textContent = e ? e.generation : 0;
@@ -374,18 +465,30 @@ function drawLearnPanel() {
   $("lr-slope-box").classList.toggle("win", !!(c && currentSlope(e) >= c.target && e.best.reachedCount === e.best.runs));
   $("lr-weg").textContent = e ? e.best.progress.toFixed(1) + " cm" : "–";
   $("lr-slip").textContent = e ? Math.round(100 * e.best.slipFrac) + " %" : "–";
-  $("lr-sigma").textContent = e ? `${e.sigma.toFixed(2)} · ${e.generation ? Math.round(100 * e.accepted / e.generation) : 0}%` : "–";
+  $("lr-sigma").textContent = !e ? "–" : isColony(e) ? `${e.sigma.toFixed(2)} · ${Math.round(100 * e.crossover)}%`
+    : `${e.sigma.toFixed(2)} · ${e.generation ? Math.round(100 * e.accepted / e.generation) : 0}%`;
+  $("lr-sigma").previousElementSibling.textContent = isColony(e) ? "σ · aus zwei Eltern" : "σ · Erfolgsquote";
   $("lr-goal").textContent = !e ? "–" : `${e.best.reachedCount}/${e.best.runs}` + (e.best.reached !== null ? ` in ${e.best.reached.toFixed(1)} s` : "");
   $("lr-goal-box").classList.toggle("win", !!(e && e.best.reached !== null));
+}
+
+function drawSwarmInfo() {
+  if (!swarm.length) { $("swarm-info").textContent = ""; return; }
+  const r = ctrl.res, par = ctrl.parents;
+  const origin = !par ? "Startnetz" : par.length === 2 ? `Kind von #${par[0]} und #${par[1]}` : `Kopie mit Mutation von #${par[0]}`;
+  $("swarm-info").textContent = `${swarm.length + 1} Ameisen laufen gleichzeitig (jede mit eigenem Netz, sie stören sich nicht). ` +
+    `Gewählt: #${ctrl.id}, Rang ${ctrl.rank}` + (r ? `, Fitness ${r.fitness.toFixed(1)}, Weg ${r.progress.toFixed(1)} cm` : "") +
+    ` – ${origin}. Andere Ameise anklicken, um ihr Netz zu sehen.`;
 }
 
 // ---------- Lernstand sichern ----------
 // Automatisch im Browser (localStorage, alle 5 s beim Lernen und beim Pausieren) und als Datei.
 const STORE_KEY = "neuronale-ameisen-lernstand";
-const UI_KEYS = ["seconds", "lambda", "slipWeight", "curriculum", "target", "step", "starts"];
+const UI_KEYS = ["seconds", "lambda", "slipWeight", "curriculum", "target", "step", "starts", "method", "size", "gaSigma", "crossover"];
 
 function saveState() {
-  return evoToJSON(learn.evo, { netSeed, ui: Object.fromEntries(UI_KEYS.map((k) => [k, learn[k]])), mu: world.mu });
+  const extra = { netSeed, ui: Object.fromEntries(UI_KEYS.map((k) => [k, learn[k]])), mu: world.mu };
+  return isColony(learn.evo) ? colonyToJSON(learn.evo, extra) : evoToJSON(learn.evo, extra);
 }
 function autoSave() {
   if (!learn.evo) return;
@@ -399,7 +502,7 @@ function autoSave() {
 setInterval(() => { if (learn.on) autoSave(); }, 5000);
 
 function applyState(o, source) {
-  const evo = evoFromJSON(o);
+  const evo = o && o.format === COLONY_FORMAT ? colonyFromJSON(o) : evoFromJSON(o);
   learn.on = false;
   learn.evo = evo;
   netSeed = o.netSeed || evo.seed;
@@ -414,12 +517,14 @@ function applyState(o, source) {
   for (const e of sliderEls) { e.inp.value = e.s.obj[e.s.key]; e.out.textContent = e.s.fmt(e.s.obj[e.s.key]); }
   $("cur-on").checked = learn.curriculum;
   $("st-" + learn.starts).checked = true;
-  $("lr-lambda").textContent = learn.lambda;
+  learn.method = isColony(evo) ? "colony" : "single";
+  $(isColony(evo) ? "me-colony" : "me-single").checked = true;
+  methodText();
   if (mode !== "net") $("m-net").click();
   setLearning(false);
   updateSliderStates();
   const when = new Date(o.saved).toLocaleString("de-CH");
-  $("lr-store").textContent = `${source}: Lernstand vom ${when}, Generation ${evo.generation}, Neigung ${currentSlope(evo)}°. «Weiter lernen» setzt fort.`;
+  $("lr-store").textContent = `${source}: ${isColony(evo) ? "Kolonie" : "Lernstand"} vom ${when}, Generation ${evo.generation}, Neigung ${currentSlope(evo)}°. «Weiter lernen» setzt fort.`;
 }
 
 $("save").addEventListener("click", () => {
@@ -427,7 +532,7 @@ $("save").addEventListener("click", () => {
   const blob = new Blob([JSON.stringify(saveState())], { type: "application/json" });
   const a = document.createElement("a");
   a.href = URL.createObjectURL(blob);
-  a.download = `ameise-gen${learn.evo.generation}-${currentSlope(learn.evo)}grad.json`;
+  a.download = `${isColony(learn.evo) ? "kolonie" : "ameise"}-gen${learn.evo.generation}-${currentSlope(learn.evo)}grad.json`;
   a.click();
   setTimeout(() => URL.revokeObjectURL(a.href), 1000);
   autoSave();

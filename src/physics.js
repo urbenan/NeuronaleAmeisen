@@ -11,6 +11,7 @@ const PHYSICS_DT = 1 / 240;   // fester Zeitschritt in s
 const WORLD_DEFAULTS = {
   g: 981,              // cm/s²
   slopeDeg: 15,        // Neigung der Ebene; hangaufwärts = +y
+  slopeXDeg: 0,        // seitliche Neigung; > 0: nach +x ansteigend (Viewer: iPhone seitlich kippen)
   mu: 0.8,             // Reibung Fuss/Boden
   muBelly: 0.6,        // Reibung, wenn der Bauch aufliegt
   minSupport: 3,       // weniger Standbeine -> Bauch trägt einen Teil des Gewichts
@@ -52,7 +53,7 @@ function solve3(A, b) {
 function physicsStep(ant, world, dt) {
   const G = ANT_GEOM;
   const m = G.mass, I = G.inertia;
-  const slope = world.slopeDeg * DEG;
+  const slope = world.slopeDeg * DEG, slopeX = (world.slopeXDeg || 0) * DEG;
 
   // 1. Gelenke bewegen, Fussbewegung relativ zum Körper bestimmen
   const oldFeet = ant.feet;
@@ -80,7 +81,7 @@ function physicsStep(ant, world, dt) {
 
   // 2. Normalkräfte: Gewicht auf die Standbeine verteilt; bei zu wenigen trägt der Bauch
   //    (verteilt auf die 3 Körpersegmente) den Rest
-  const Ntot = m * world.g * Math.cos(slope);
+  const Ntot = m * world.g * Math.cos(slope) * Math.cos(slopeX);
   const nLegs = contacts.length;
   ant.bellyFrac = Math.max(0, (world.minSupport - nLegs) / world.minSupport);
   for (const ct of contacts) ct.N = Ntot * (1 - ant.bellyFrac) / nLegs;
@@ -97,7 +98,7 @@ function physicsStep(ant, world, dt) {
   const kd = 2 * world.legDamping * Math.sqrt(kp * m / 3);
   const k = kd + kp * dt;
   for (const ct of contacts) { ct.ux += kp / k * ct.ex; ct.uy += kp / k * ct.ey; }
-  const Fgx = 0, Fgy = -m * world.g * Math.sin(slope);
+  const Fgx = -m * world.g * Math.sin(slopeX), Fgy = -m * world.g * Math.sin(slope);
   let sol = [ant.vx, ant.vy, ant.omega];
   for (let iter = 0; iter < 5; iter++) {
     const A = [[m, 0, 0], [0, m, 0], [0, 0, I]];

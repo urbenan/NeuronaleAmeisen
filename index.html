@@ -85,6 +85,7 @@ button:focus-visible, input:focus-visible, .seg input:focus-visible + label { ou
 .slider output { font-family: var(--font-num); color: var(--ink); font-variant-numeric: tabular-nums; }
 .slider input { grid-column: 1 / -1; width: 100%; accent-color: var(--accent); }
 .slider.off { opacity: 0.45; }
+.slider[hidden] { display: none; }
 .check { display: inline-flex; gap: 6px; align-items: center; font-size: 0.88rem; }
 .check input { accent-color: var(--accent); width: 18px; height: 18px; }
 
@@ -139,7 +140,8 @@ button:focus-visible, input:focus-visible, .seg input:focus-visible + label { ou
 <div class="wrap">
   <header>
     <h1>Neuronale Ameisen</h1>
-    <p class="sub">Schritt 5 – den Hang hinauf: Die Ameise lernt erst flach, dann immer steiler (Curriculum), und muss aus verschiedenen Richtungen dem Duft nach oben folgen.</p>
+    <a class="sub" href="viewer.html">Viewer fürs iPhone →</a>
+    <p class="sub">Schritt 7 – die Kolonie: viele Ameisen, jede mit eigenem Netz. Die besten vererben ihre Neuronen an die nächste Generation.</p>
   </header>
 
   <section class="panel">
@@ -196,6 +198,13 @@ button:focus-visible, input:focus-visible, .seg input:focus-visible + label { ou
           </div>
         </div>
         <div class="controls">
+          <div class="group">
+            <span class="lab">Lernart</span>
+            <div class="seg" role="radiogroup">
+              <input type="radio" name="method" id="me-colony" value="colony" checked><label for="me-colony">Kolonie</label>
+              <input type="radio" name="method" id="me-single" value="single"><label for="me-single">eine Ameise</label>
+            </div>
+          </div>
           <label class="check"><input type="checkbox" id="cur-on" checked> Curriculum: Neigung steigern, sobald oben angekommen</label>
           <div class="group">
             <span class="lab">Startrichtungen</span>
@@ -220,8 +229,9 @@ button:focus-visible, input:focus-visible, .seg input:focus-visible + label { ou
       </div>
       <div class="netbox">
         <canvas id="curve" aria-label="Lernkurve: Fitness über die Episoden"></canvas>
-        <div class="legend"><span><span class="dot" style="background:var(--accent)"></span>Fitness bestes Netz</span><span><span class="dot" style="background:var(--muted);opacity:.5"></span>bester Versuch einer Generation</span><span><span class="dot" style="background:var(--goal)"></span>Neigung (rechte Achse)</span></div>
-        <p class="small">Pro Generation entstehen <b id="lr-lambda">8</b> Varianten des besten Netzes (alle Gewichte um σ zufällig verändert). Jede läuft eine Episode; ist die beste mindestens so gut, wird sie das neue beste Netz. <b>Fitness</b> = Weg zur Duftquelle in cm × (1 − Anteil rutschender Füsse), am Ziel Bonus + 2 pro gesparte Sekunde – je schneller oben, desto besser. Bei 3 Startrichtungen zählt der Mittelwert: Wer schräg startet, muss mit den Fühlern den Weg nach oben finden. <b>Curriculum</b>: Kommt das beste Netz bei allen Starts oben an, wird der Hang um eine Stufe steiler. Direkt am steilen Hang lernt die Ameise nur stillzustehen. Die Welt zeigt immer das aktuell beste Netz, reihum aus allen Startrichtungen.</p>
+        <div class="legend"><span><span class="dot" style="background:var(--accent)"></span>Fitness bestes Netz</span><span><span class="dot" style="background:var(--muted);opacity:.5"></span><span id="dots-what">bester Versuch einer Generation</span></span><span><span class="dot" style="background:var(--goal)"></span>Neigung (rechte Achse)</span></div>
+        <p class="small" id="method-text"></p>
+        <p class="small"> <b>Fitness</b> = Weg zur Duftquelle in cm × (1 − Anteil rutschender Füsse), am Ziel Bonus + 2 pro gesparte Sekunde – je schneller oben, desto besser. Bei 3 Startrichtungen zählt der Mittelwert: Wer schräg startet, muss mit den Fühlern den Weg nach oben finden. <b>Curriculum</b>: Kommt das beste Netz bei allen Starts oben an, wird der Hang um eine Stufe steiler. Direkt am steilen Hang lernt die Ameise nur stillzustehen. Die Welt zeigt immer das aktuell beste Netz, reihum aus allen Startrichtungen.</p>
       </div>
     </div>
   </section>
@@ -237,6 +247,7 @@ button:focus-visible, input:focus-visible, .seg input:focus-visible + label { ou
         <span><span class="dot" style="background:rgb(var(--scent-rgb))"></span>Duft / Fühlerspitze (Sensor)</span>
         <span>Mausrad / Pinch: Zoom</span>
       </div>
+      <p class="small" id="swarm-info"></p>
     </section>
     <div style="display:grid; gap:16px; align-content:start">
       <section class="panel">
@@ -316,6 +327,7 @@ button:focus-visible, input:focus-visible, .seg input:focus-visible + label { ou
 <script src="src/render.js"></script>
 <script src="src/netview.js"></script>
 <script src="src/evolution.js"></script>
+<script src="src/ga.js"></script>
 <script src="src/learnview.js"></script>
 <script src="src/main.js"></script>
 </body>

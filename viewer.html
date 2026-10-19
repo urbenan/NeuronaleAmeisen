@@ -1,0 +1,86 @@
+<!doctype html>
+<html lang="de">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover, user-scalable=no">
+<title>Ameisen-Viewer</title>
+<style>
+/* Vollbild nur mit Ameisen. Farben wie die Hauptseite (index.html). */
+:root {
+  --bg: #eef1f4; --surface: #ffffff; --ink: #1b2733; --muted: #5b6875; --line: #d4dbe2; --accent: #1f4e79;
+  --ground-lo: #f3ecd9; --ground-hi: #d9c9a0; --grid: rgba(90, 70, 30, 0.10);
+  --ant-body: #3b2417; --ant-edge: #1e110a; --ant-leg: #4a2e1d;
+  --stance: #1f4e79; --swing: #8a6d55; --slip: #d23b2f; --force: #c0571b;
+  --scent-rgb: 142, 68, 173; --hud: rgba(255, 255, 255, 0.82);
+  --font-ui: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+  --font-num: ui-monospace, "SF Mono", Menlo, Consolas, "Liberation Mono", monospace;
+}
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    --bg: #10161c; --surface: #18212a; --ink: #e2e8ee; --muted: #94a2b0; --line: #2b3742; --accent: #8dbbe8;
+    --ground-lo: #2a261d; --ground-hi: #4a4029; --grid: rgba(240, 220, 170, 0.07);
+    --ant-body: #1a0f09; --ant-edge: #c9a585; --ant-leg: #d8b898; --stance: #8dbbe8; --swing: #b89a80;
+    --scent-rgb: 205, 150, 240; --hud: rgba(24, 33, 42, 0.82); color-scheme: dark;
+  }
+}
+:root[data-theme="dark"] {
+  --bg: #10161c; --surface: #18212a; --ink: #e2e8ee; --muted: #94a2b0; --line: #2b3742; --accent: #8dbbe8;
+  --ground-lo: #2a261d; --ground-hi: #4a4029; --grid: rgba(240, 220, 170, 0.07);
+  --ant-body: #1a0f09; --ant-edge: #c9a585; --ant-leg: #d8b898; --stance: #8dbbe8; --swing: #b89a80;
+  --scent-rgb: 205, 150, 240; --hud: rgba(24, 33, 42, 0.82); color-scheme: dark;
+}
+* { box-sizing: border-box; }
+html, body { margin: 0; height: 100%; background: var(--bg); color: var(--ink); overflow: hidden;
+  font-family: var(--font-ui); -webkit-text-size-adjust: 100%; -webkit-user-select: none; user-select: none; }
+#cv { position: fixed; inset: 0; width: 100vw; height: 100vh; height: 100dvh; display: block; touch-action: none; }
+
+.hud { position: fixed; display: flex; gap: 8px; align-items: center; pointer-events: none; }
+.hud > * { pointer-events: auto; }
+.pill { background: var(--hud); border: 1px solid var(--line); border-radius: 999px; padding: 6px 12px;
+  font-family: var(--font-num); font-size: 0.95rem; font-variant-numeric: tabular-nums; backdrop-filter: blur(6px); -webkit-backdrop-filter: blur(6px); }
+#top { top: max(10px, env(safe-area-inset-top)); left: max(10px, env(safe-area-inset-left)); right: max(10px, env(safe-area-inset-right)); justify-content: space-between; }
+#bar { bottom: max(10px, env(safe-area-inset-bottom)); left: max(10px, env(safe-area-inset-left)); right: max(10px, env(safe-area-inset-right));
+  flex-wrap: wrap; justify-content: center; transition: opacity 0.4s; }
+#bar.hide { opacity: 0; pointer-events: none; }
+#bar.hide > * { pointer-events: none; }
+button, select { font: inherit; font-size: 0.92rem; border-radius: 999px; border: 1px solid var(--line); background: var(--hud);
+  color: var(--ink); padding: 8px 14px; min-height: 40px; backdrop-filter: blur(6px); -webkit-backdrop-filter: blur(6px); }
+button.primary { background: var(--accent); color: var(--surface); border-color: var(--accent); font-weight: 600; }
+#slider { display: none; align-items: center; gap: 8px; }
+#slider input { width: 160px; accent-color: var(--accent); }
+#msg { position: fixed; left: 50%; top: 50%; transform: translate(-50%, -50%); max-width: min(420px, calc(100vw - 32px));
+  background: var(--hud); border: 1px solid var(--line); border-radius: 14px; padding: 14px 16px; font-size: 0.92rem; line-height: 1.45;
+  backdrop-filter: blur(6px); -webkit-backdrop-filter: blur(6px); }
+#msg[hidden] { display: none; }
+#msg b { color: var(--accent); }
+</style>
+</head>
+<body>
+<canvas id="cv" aria-label="Ameisen von oben"></canvas>
+
+<div class="hud" id="top">
+  <span class="pill" id="tilt">↑ 0° · ↔ 0°</span>
+  <span class="pill" id="count">oben: 0</span>
+</div>
+
+<div class="hud" id="bar">
+  <button id="sensor" class="primary">Lagesensor einschalten</button>
+  <button id="zero">Nullpunkt</button>
+  <label id="slider" class="pill">Neigung <input type="range" id="slope" min="-30" max="40" step="1" value="10"><span id="slope-v">10°</span></label>
+  <select id="source" aria-label="Welche Ameisen"></select>
+  <button id="file">Datei…</button>
+  <button id="help">?</button>
+  <input type="file" id="file-in" accept=".json,application/json" hidden>
+</div>
+
+<div id="msg" hidden></div>
+
+<script src="src/ant.js"></script>
+<script src="src/physics.js"></script>
+<script src="src/scent.js"></script>
+<script src="src/nn.js"></script>
+<script src="src/brain.js"></script>
+<script src="src/render.js"></script>
+<script src="src/viewer.js"></script>
+</body>
+</html>

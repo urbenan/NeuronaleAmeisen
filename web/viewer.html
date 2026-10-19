@@ -1,0 +1,1035 @@
+<!doctype html>
+<html lang="de">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover, user-scalable=no">
+<title>Ameisen-Viewer</title>
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-title" content="Ameisen-Viewer">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="theme-color" content="#1f4e79">
+<link rel="manifest" href="manifest-viewer.webmanifest">
+<link rel="apple-touch-icon" href="icon-180.png">
+<style>
+/* Vollbild nur mit Ameisen. Farben wie die Hauptseite (index.html). */
+:root {
+  --bg: #eef1f4; --surface: #ffffff; --ink: #1b2733; --muted: #5b6875; --line: #d4dbe2; --accent: #1f4e79;
+  --ground-lo: #f3ecd9; --ground-hi: #d9c9a0; --grid: rgba(90, 70, 30, 0.10);
+  --ant-body: #3b2417; --ant-edge: #1e110a; --ant-leg: #4a2e1d;
+  --stance: #1f4e79; --swing: #8a6d55; --slip: #d23b2f; --force: #c0571b;
+  --scent-rgb: 142, 68, 173; --hud: rgba(255, 255, 255, 0.82);
+  --font-ui: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+  --font-num: ui-monospace, "SF Mono", Menlo, Consolas, "Liberation Mono", monospace;
+}
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    --bg: #10161c; --surface: #18212a; --ink: #e2e8ee; --muted: #94a2b0; --line: #2b3742; --accent: #8dbbe8;
+    --ground-lo: #2a261d; --ground-hi: #4a4029; --grid: rgba(240, 220, 170, 0.07);
+    --ant-body: #1a0f09; --ant-edge: #c9a585; --ant-leg: #d8b898; --stance: #8dbbe8; --swing: #b89a80;
+    --scent-rgb: 205, 150, 240; --hud: rgba(24, 33, 42, 0.82); color-scheme: dark;
+  }
+}
+:root[data-theme="dark"] {
+  --bg: #10161c; --surface: #18212a; --ink: #e2e8ee; --muted: #94a2b0; --line: #2b3742; --accent: #8dbbe8;
+  --ground-lo: #2a261d; --ground-hi: #4a4029; --grid: rgba(240, 220, 170, 0.07);
+  --ant-body: #1a0f09; --ant-edge: #c9a585; --ant-leg: #d8b898; --stance: #8dbbe8; --swing: #b89a80;
+  --scent-rgb: 205, 150, 240; --hud: rgba(24, 33, 42, 0.82); color-scheme: dark;
+}
+* { box-sizing: border-box; }
+html, body { margin: 0; height: 100%; background: var(--bg); color: var(--ink); overflow: hidden;
+  font-family: var(--font-ui); -webkit-text-size-adjust: 100%; -webkit-user-select: none; user-select: none; }
+#cv { position: fixed; inset: 0; width: 100vw; height: 100vh; height: 100dvh; display: block; touch-action: none; }
+
+.hud { position: fixed; display: flex; gap: 8px; align-items: center; pointer-events: none; }
+.hud > * { pointer-events: auto; }
+.pill { background: var(--hud); border: 1px solid var(--line); border-radius: 999px; padding: 6px 12px;
+  font-family: var(--font-num); font-size: 0.95rem; font-variant-numeric: tabular-nums; backdrop-filter: blur(6px); -webkit-backdrop-filter: blur(6px); }
+#top { top: max(10px, env(safe-area-inset-top)); left: max(10px, env(safe-area-inset-left)); right: max(10px, env(safe-area-inset-right)); justify-content: space-between; }
+#bar { bottom: max(10px, env(safe-area-inset-bottom)); left: max(10px, env(safe-area-inset-left)); right: max(10px, env(safe-area-inset-right));
+  flex-wrap: wrap; justify-content: center; transition: opacity 0.4s; }
+#bar.hide { opacity: 0; pointer-events: none; }
+#bar.hide > * { pointer-events: none; }
+button, select { font: inherit; font-size: 0.92rem; border-radius: 999px; border: 1px solid var(--line); background: var(--hud);
+  color: var(--ink); padding: 8px 14px; min-height: 40px; backdrop-filter: blur(6px); -webkit-backdrop-filter: blur(6px); }
+button.primary { background: var(--accent); color: var(--surface); border-color: var(--accent); font-weight: 600; }
+#slider { display: none; align-items: center; gap: 8px; }
+#slider input { width: 160px; accent-color: var(--accent); }
+#msg { position: fixed; left: 50%; top: 50%; transform: translate(-50%, -50%); max-width: min(420px, calc(100vw - 32px));
+  background: var(--hud); border: 1px solid var(--line); border-radius: 14px; padding: 14px 16px; font-size: 0.92rem; line-height: 1.45;
+  backdrop-filter: blur(6px); -webkit-backdrop-filter: blur(6px); }
+#msg[hidden] { display: none; }
+#msg b { color: var(--accent); }
+</style>
+</head>
+<body>
+<canvas id="cv" aria-label="Ameisen von oben"></canvas>
+
+<div class="hud" id="top">
+  <span class="pill" id="tilt">↑ 0° · ↔ 0°</span>
+  <span class="pill" id="count">oben: 0</span>
+</div>
+
+<div class="hud" id="bar">
+  <button id="sensor" class="primary">Lagesensor einschalten</button>
+  <button id="zero">Nullpunkt</button>
+  <label id="slider" class="pill">Neigung <input type="range" id="slope" min="-30" max="40" step="1" value="10"><span id="slope-v">10°</span></label>
+  <select id="source" aria-label="Welche Ameisen"></select>
+  <button id="file">Datei…</button>
+  <button id="help">?</button>
+  <input type="file" id="file-in" accept=".json,application/json" hidden>
+</div>
+
+<div id="msg" hidden></div>
+
+<script>
+// ---- src/ant.js ----
+// Ameise: Geometrie, Gelenke und Vorwärtskinematik.
+// Einheiten: cm, s, Masse relativ (nur Verhältnisse zählen), Winkel intern in Radiant.
+// Körperkoordinaten: x' nach vorne (zum Kopf), y' nach links, z nach oben.
+
+const DEG = Math.PI / 180;
+
+const LEG_NAMES = ["L1", "L2", "L3", "R1", "R2", "R3"];
+const JOINT_NAMES = ["α Hüfte (dreh)", "β Hüfte (heben)", "γ Knie"];
+
+// Gelenkgrenzen [min, max] in Grad, gleich für alle Beine
+const JOINT_LIMITS = [
+  [-40, 40],   // α: Drehung um die Hochachse, + = nach vorne
+  [-20, 60],   // β: Oberschenkel heben, + = nach oben
+  [20, 130],   // γ: Knie beugen, + = Unterschenkel nach unten
+];
+const JOINT_MAX_SPEED = 900 * DEG;  // rad/s
+const JOINT_KP = 200;               // 1/s, wie schnell ein Gelenk dem Sollwert folgt
+
+const ANT_GEOM = (() => {
+  // 3 Massenpunkte entlang der Körperachse; x relativ zum Thorax-Mittelpunkt
+  const segments = [
+    { name: "Kopf", x: 0.42, m: 0.25, rx: 0.13, ry: 0.11 },
+    { name: "Thorax", x: 0.12, m: 0.35, rx: 0.17, ry: 0.09 },
+    { name: "Abdomen", x: -0.32, m: 0.6, rx: 0.25, ry: 0.17 },
+  ];
+  const mass = segments.reduce((s, g) => s + g.m, 0);
+  const comX = segments.reduce((s, g) => s + g.m * g.x, 0) / mass;
+  // Ab hier alles relativ zum Schwerpunkt
+  for (const g of segments) g.x -= comX;
+  const inertia = segments.reduce((s, g) => s + g.m * (g.x * g.x + (g.rx * g.rx + g.ry * g.ry) / 4), 0);
+
+  const thoraxX = segments[1].x;
+  const legs = [];
+  const hipX = [0.08, 0.0, -0.08];      // relativ zum Thorax
+  const restDeg = [45, 90, 135];         // Ruherichtung von oben, 0° = nach vorne
+  for (let side = 0; side < 2; side++) {
+    const s = side === 0 ? 1 : -1;       // links +1, rechts -1
+    for (let i = 0; i < 3; i++) {
+      legs.push({ name: LEG_NAMES[side * 3 + i], side: s, hipX: thoraxX + hipX[i], hipY: s * 0.07, rest: restDeg[i] * DEG });
+    }
+  }
+  const head = segments[0];
+  return {
+    segments, mass, inertia, legs,
+    hipHeight: 0.2, femur: 0.35, tibia: 0.45,
+    // Fühler: zweiteilig (Schaft + Geissel), ab der Kopfspitze
+    antenna: { baseX: head.x + head.rx * 0.8, baseY: 0.04, scape: 0.2, flag: 0.3, angle1: 35 * DEG, angle2: 20 * DEG },
+  };
+})();
+
+function createAnt(x = 0, y = 0, heading = Math.PI / 2) {
+  const joints = new Float64Array(18);
+  for (let l = 0; l < 6; l++) joints.set(NEUTRAL_POSE[l], l * 3);
+  const ant = {
+    x, y, heading, vx: 0, vy: 0, omega: 0,
+    joints, targets: Float64Array.from(joints),
+    feet: [],          // pro Bein: Fuss in Körperkoordinaten {x, y, z}, Knie {kx, ky}
+    contact: new Uint8Array(6),
+    footForce: Array.from({ length: 6 }, () => ({ x: 0, y: 0 })),
+    slipping: new Uint8Array(6),
+    anchors: Array.from({ length: 6 }, () => null),   // Haftpunkt des Fusses in Weltkoordinaten
+    bellyFrac: 0,
+  };
+  updateKinematics(ant);
+  return ant;
+}
+
+// Fuss- und Knieposition eines Beins in Körperkoordinaten
+function legKinematics(leg, a, b, g) {
+  const G = ANT_GEOM;
+  const dir = leg.side * (leg.rest - a);           // Richtung von oben, + a schwenkt zum Kopf
+  const cx = Math.cos(dir), cy = Math.sin(dir);
+  const r1 = G.femur * Math.cos(b);
+  const z1 = G.hipHeight + G.femur * Math.sin(b);
+  const r2 = G.tibia * Math.cos(b - g);
+  const z = z1 + G.tibia * Math.sin(b - g);
+  return {
+    kx: leg.hipX + cx * r1, ky: leg.hipY + cy * r1, kz: z1,
+    x: leg.hipX + cx * (r1 + r2), y: leg.hipY + cy * (r1 + r2), z,
+  };
+}
+
+// Inverse Kinematik: Gelenkwinkel [α, β, γ], damit der Fuss bei (fx, fy, fz) in Körperkoordinaten steht.
+// Knie oben (wie bei der Ameise). Zu weite Ziele werden auf die maximale Reichweite gekürzt.
+function legIK(leg, fx, fy, fz) {
+  const G = ANT_GEOM, L1 = G.femur, L2 = G.tibia;
+  const dx = fx - leg.hipX, dy = fy - leg.hipY;
+  const a = leg.rest - leg.side * Math.atan2(dy, dx);
+  const r = Math.hypot(dx, dy), dz = fz - G.hipHeight;
+  const D = Math.min(Math.hypot(r, dz), 0.98 * (L1 + L2));
+  const g = Math.acos(Math.max(-1, Math.min(1, (D * D - L1 * L1 - L2 * L2) / (2 * L1 * L2))));
+  const b = Math.atan2(dz, r) + Math.atan2(L2 * Math.sin(g), L1 + L2 * Math.cos(g));
+  return [a, b, g];
+}
+
+// Grundstellung: Fuss in Ruherichtung, 0.5 cm von der Hüfte, knapp unter Bodenhöhe
+const STANCE_REACH = 0.5, STANCE_Z = -0.01;
+const NEUTRAL_FEET = ANT_GEOM.legs.map((leg) => {
+  const dir = leg.side * leg.rest;
+  return { x: leg.hipX + STANCE_REACH * Math.cos(dir), y: leg.hipY + STANCE_REACH * Math.sin(dir) };
+});
+const NEUTRAL_POSE = ANT_GEOM.legs.map((leg, l) => legIK(leg, NEUTRAL_FEET[l].x, NEUTRAL_FEET[l].y, STANCE_Z));
+
+function updateKinematics(ant) {
+  const j = ant.joints;
+  ant.feet = ANT_GEOM.legs.map((leg, l) => legKinematics(leg, j[l * 3], j[l * 3 + 1], j[l * 3 + 2]));
+}
+
+function clampTarget(i, v) {
+  const [lo, hi] = JOINT_LIMITS[i % 3];
+  return Math.min(hi * DEG, Math.max(lo * DEG, v));
+}
+
+// Körperkoordinaten -> Welt
+function toWorld(ant, px, py) {
+  const c = Math.cos(ant.heading), s = Math.sin(ant.heading);
+  return { x: ant.x + c * px - s * py, y: ant.y + s * px + c * py };
+}
+
+// Fühlerspitzen (später Duftsensoren): [links, rechts] in Weltkoordinaten
+function antennaPoints(ant) {
+  const A = ANT_GEOM.antenna;
+  return [1, -1].map((s) => {
+    const a1 = s * A.angle1, a2 = s * (A.angle1 + A.angle2);
+    const bx = A.baseX, by = s * A.baseY;
+    const ex = bx + A.scape * Math.cos(a1), ey = by + A.scape * Math.sin(a1);
+    const tx = ex + A.flag * Math.cos(a2), ty = ey + A.flag * Math.sin(a2);
+    return { base: toWorld(ant, bx, by), elbow: toWorld(ant, ex, ey), tip: toWorld(ant, tx, ty) };
+  });
+}
+</script>
+<script>
+// ---- src/physics.js ----
+// Einfaches Physikmodell: starrer Körper in der Ebene (x, y, Drehung), Beine als Kinematik.
+// Vortrieb entsteht nur durch Reibung an den Füssen, die den Boden berühren (z <= 0).
+//
+// Reibung pro Fuss ("Haften"): Beim Aufsetzen merkt sich der Fuss einen Ankerpunkt am Boden.
+// Eine steife Feder mit Dämpfer hält ihn dort, begrenzt auf mu * N (Coulomb). Reicht die Reibung
+// nicht, gleitet der Fuss und der Anker wandert mit. Die Kräfte werden implizit gelöst
+// (3x3-Gleichungssystem für vx, vy, omega), damit die Simulation auch bei steifen Federn stabil bleibt.
+
+const PHYSICS_DT = 1 / 240;   // fester Zeitschritt in s
+
+const WORLD_DEFAULTS = {
+  g: 981,              // cm/s²
+  slopeDeg: 15,        // Neigung der Ebene; hangaufwärts = +y
+  slopeXDeg: 0,        // seitliche Neigung; > 0: nach +x ansteigend (Viewer: iPhone seitlich kippen)
+  mu: 0.8,             // Reibung Fuss/Boden
+  muBelly: 0.6,        // Reibung, wenn der Bauch aufliegt
+  minSupport: 3,       // weniger Standbeine -> Bauch trägt einen Teil des Gewichts
+  legGive: 0.05,       // Nachgiebigkeit des Beins in cm: so weit federt ein Fuss unter 1/3 Körpergewicht
+                       // seitlich, bevor er rutscht. Echte Beine sind elastisch; ganz steif müssten die
+                       // Füsse geometrisch perfekt zusammenarbeiten, sonst rutscht immer einer.
+  legDamping: 0.5,     // Dämpfungsgrad der Beinfeder (1 = kritisch gedämpft)
+};
+
+function moveJoints(ant, dt) {
+  const j = ant.joints, t = ant.targets;
+  const maxStep = JOINT_MAX_SPEED * dt;
+  for (let i = 0; i < 18; i++) {
+    const target = clampTarget(i, t[i]);
+    const step = Math.max(-maxStep, Math.min(maxStep, JOINT_KP * (target - j[i]) * dt));
+    j[i] += step;
+  }
+}
+
+function solve3(A, b) {
+  // Gauss-Elimination ohne Pivotsuche (A ist symmetrisch positiv definit)
+  const M = [A[0].slice(), A[1].slice(), A[2].slice()], r = b.slice();
+  for (let i = 0; i < 3; i++) {
+    for (let k = i + 1; k < 3; k++) {
+      const f = M[k][i] / M[i][i];
+      for (let c = i; c < 3; c++) M[k][c] -= f * M[i][c];
+      r[k] -= f * r[i];
+    }
+  }
+  const x = [0, 0, 0];
+  for (let i = 2; i >= 0; i--) {
+    let s = r[i];
+    for (let c = i + 1; c < 3; c++) s -= M[i][c] * x[c];
+    x[i] = s / M[i][i];
+  }
+  return x;
+}
+
+function physicsStep(ant, world, dt) {
+  const G = ANT_GEOM;
+  const m = G.mass, I = G.inertia;
+  const slope = world.slopeDeg * DEG, slopeX = (world.slopeXDeg || 0) * DEG;
+
+  // 1. Gelenke bewegen, Fussbewegung relativ zum Körper bestimmen
+  const oldFeet = ant.feet;
+  moveJoints(ant, dt);
+  updateKinematics(ant);
+
+  const c = Math.cos(ant.heading), s = Math.sin(ant.heading);
+  const contacts = [];
+  for (let l = 0; l < 6; l++) {
+    const f = ant.feet[l], o = oldFeet[l];
+    ant.contact[l] = f.z <= 0 ? 1 : 0;
+    ant.slipping[l] = 0;
+    ant.footForce[l].x = 0; ant.footForce[l].y = 0;
+    if (!ant.contact[l]) { ant.anchors[l] = null; continue; }
+    const rx = c * f.x - s * f.y, ry = s * f.x + c * f.y;   // Hebelarm in Weltrichtung
+    if (!ant.anchors[l]) ant.anchors[l] = { x: ant.x + rx, y: ant.y + ry };
+    const ulx = (f.x - o.x) / dt, uly = (f.y - o.y) / dt;
+    contacts.push({
+      leg: l, rx, ry,
+      ux: c * ulx - s * uly, uy: s * ulx + c * uly,          // Fussgeschwindigkeit relativ zum Körper
+      ex: ant.x + rx - ant.anchors[l].x, ey: ant.y + ry - ant.anchors[l].y,   // Abstand zum Anker
+      mu: world.mu, N: 0, slip: false, fx: 0, fy: 0,
+    });
+  }
+
+  // 2. Normalkräfte: Gewicht auf die Standbeine verteilt; bei zu wenigen trägt der Bauch
+  //    (verteilt auf die 3 Körpersegmente) den Rest
+  const Ntot = m * world.g * Math.cos(slope) * Math.cos(slopeX);
+  const nLegs = contacts.length;
+  ant.bellyFrac = Math.max(0, (world.minSupport - nLegs) / world.minSupport);
+  for (const ct of contacts) ct.N = Ntot * (1 - ant.bellyFrac) / nLegs;
+  if (ant.bellyFrac > 0) {
+    for (const g of G.segments) {
+      contacts.push({ leg: -1, rx: c * g.x, ry: s * g.x, ux: 0, uy: 0, ex: 0, ey: 0,
+        mu: world.muBelly, N: Ntot * ant.bellyFrac * g.m / m, slip: false, fx: 0, fy: 0 });
+    }
+  }
+
+  // 3. Haften/Gleiten implizit lösen
+  // Feder kp und Dämpfer kd pro Fuss; implizit: F = -k * (v_rutsch + kp/k * Abstand) mit k = kd + kp*dt
+  const kp = m * world.g / 3 / world.legGive;
+  const kd = 2 * world.legDamping * Math.sqrt(kp * m / 3);
+  const k = kd + kp * dt;
+  for (const ct of contacts) { ct.ux += kp / k * ct.ex; ct.uy += kp / k * ct.ey; }
+  const Fgx = -m * world.g * Math.sin(slopeX), Fgy = -m * world.g * Math.sin(slope);
+  let sol = [ant.vx, ant.vy, ant.omega];
+  for (let iter = 0; iter < 5; iter++) {
+    const A = [[m, 0, 0], [0, m, 0], [0, 0, I]];
+    const b = [m * ant.vx + dt * Fgx, m * ant.vy + dt * Fgy, I * ant.omega];
+    for (const ct of contacts) {
+      const jx = -ct.ry, jy = ct.rx;    // omega x r = omega * (jx, jy)
+      if (ct.slip) {
+        b[0] += dt * ct.fx; b[1] += dt * ct.fy; b[2] += dt * (jx * ct.fx + jy * ct.fy);
+      } else {
+        const kd = dt * k;
+        A[0][0] += kd; A[1][1] += kd;
+        A[0][2] += kd * jx; A[2][0] += kd * jx;
+        A[1][2] += kd * jy; A[2][1] += kd * jy;
+        A[2][2] += kd * (jx * jx + jy * jy);
+        b[0] -= kd * ct.ux; b[1] -= kd * ct.uy; b[2] -= kd * (jx * ct.ux + jy * ct.uy);
+      }
+    }
+    sol = solve3(A, b);
+    let changed = false;
+    for (const ct of contacts) {
+      if (ct.slip) continue;
+      const jx = -ct.ry, jy = ct.rx;
+      const fx = -k * (sol[0] + sol[2] * jx + ct.ux);
+      const fy = -k * (sol[1] + sol[2] * jy + ct.uy);
+      const fmax = ct.mu * ct.N, fn = Math.hypot(fx, fy);
+      if (fn > fmax) {
+        ct.slip = true; ct.fx = fx / fn * fmax; ct.fy = fy / fn * fmax; changed = true;
+      } else {
+        ct.fx = fx; ct.fy = fy;
+      }
+    }
+    if (!changed) break;
+  }
+
+  // 4. Integrieren
+  ant.vx = sol[0]; ant.vy = sol[1]; ant.omega = sol[2];
+  ant.x += ant.vx * dt; ant.y += ant.vy * dt; ant.heading += ant.omega * dt;
+  for (const ct of contacts) {
+    if (ct.leg < 0) continue;
+    ant.footForce[ct.leg].x = ct.fx; ant.footForce[ct.leg].y = ct.fy;
+    ant.slipping[ct.leg] = ct.slip ? 1 : 0;
+    if (ct.slip) ant.anchors[ct.leg] = null;   // gleitender Fuss: neuer Anker im nächsten Schritt
+  }
+}
+</script>
+<script>
+// ---- src/scent.js ----
+// Duftfeld und Fühler-Sensoren.
+// Die Duftquelle liegt oben am Hang (auf der Ziellinie). Konzentration C = exp(-Abstand / λ), 0..1.
+// Jede Fühlerspitze misst C (optional mit Rauschen). Für das Netz werden daraus normierte Werte:
+//   intensity = Mittelwert von C (0 = weit weg, 1 = an der Quelle)
+//   diff      = (ln C_links − ln C_rechts) · λ / Fühlerabstand, etwa −1..+1
+//               > 0: Duft kommt eher von links,  < 0: eher von rechts
+// Der Logarithmus wirkt wie beim echten Geruchssinn: Er misst relative Unterschiede, damit die
+// Richtung auch weit weg von der Quelle noch erkennbar ist.
+
+const SCENT_DEFAULTS = {
+  x: 0, y: 20,     // Quelle, Weltkoordinaten in cm (y = Ziellinie)
+  lambda: 10,      // Reichweite in cm (Abfall auf 37 %)
+  noise: 0,        // relatives Messrauschen pro Fühler, z. B. 0.05 = 5 %
+};
+
+function scentAt(scent, x, y) {
+  return Math.exp(-Math.hypot(x - scent.x, y - scent.y) / scent.lambda);
+}
+
+// Normalverteilte Zufallszahl; rng liefert gleichverteilt 0..1 (für reproduzierbare Episoden austauschbar)
+function gauss(rng) {
+  return Math.sqrt(-2 * Math.log(1 - rng())) * Math.cos(2 * Math.PI * rng());
+}
+
+function senseScent(ant, scent, rng = Math.random) {
+  const [l, r] = antennaPoints(ant);
+  const read = (p) => {
+    const c = scentAt(scent, p.tip.x, p.tip.y);
+    return scent.noise > 0 ? Math.max(1e-9, c * (1 + scent.noise * gauss(rng))) : c;
+  };
+  const left = read(l), right = read(r);
+  const span = Math.hypot(l.tip.x - r.tip.x, l.tip.y - r.tip.y);
+  const diff = (Math.log(left) - Math.log(right)) * scent.lambda / span;
+  return { left, right, intensity: (left + right) / 2, diff: Math.max(-1.5, Math.min(1.5, diff)) };
+}
+
+// Einfache Test-Lenkung (Braitenberg): stärker riechende Seite -> dorthin drehen.
+// Geglättet (Zeitkonstante tau), weil der Kopf beim Gehen hin und her pendelt.
+// Nur zum Prüfen der Sensoren; später übernimmt das Netz.
+function scentSteer(prevTurn, sense, gain, dt, tau = 0.3) {
+  const want = Math.max(-1, Math.min(1, gain * sense.diff));
+  return prevTurn + (want - prevTurn) * Math.min(1, dt / tau);
+}
+</script>
+<script>
+// ---- src/nn.js ----
+// 3-Schicht-Netz wie beim Ziffern-Projekt: h = tanh(x·W1 + b1), y = tanh(h·W2 + b2).
+// Gewichte zeilenweise: W1[i * H + j] verbindet Eingang i mit verborgenem Neuron j,
+//                       W2[j * O + k] verbindet verborgenes Neuron j mit Ausgang k.
+// Gelernt wird später nicht mit Backpropagation, sondern per Neuroevolution (mutieren + auswählen).
+
+// Reproduzierbarer Zufall (mulberry32): gleicher Startwert -> gleiche Gewichte, gleiche Mutationen
+function makeRng(seed) {
+  let a = seed >>> 0;
+  return () => {
+    a = (a + 0x6D2B79F5) >>> 0;
+    let t = a;
+    t = Math.imul(t ^ (t >>> 15), t | 1);
+    t ^= t + Math.imul(t ^ (t >>> 7), t | 61);
+    return ((t ^ (t >>> 14)) >>> 0) / 4294967296;
+  };
+}
+
+function randn(rng) {
+  return Math.sqrt(-2 * Math.log(1 - rng())) * Math.cos(2 * Math.PI * rng());
+}
+
+// Startgewichte ~ N(0, 1/Eingänge), damit tanh nicht gleich in die Sättigung geht; Schwellen 0
+function createNet(nIn, nHid, nOut, rng) {
+  const net = {
+    nIn, nHid, nOut,
+    W1: new Float64Array(nIn * nHid), b1: new Float64Array(nHid),
+    W2: new Float64Array(nHid * nOut), b2: new Float64Array(nOut),
+    // letzte Aktivierungen, für die Anzeige
+    x: new Float64Array(nIn), h: new Float64Array(nHid), y: new Float64Array(nOut),
+  };
+  const s1 = 1 / Math.sqrt(nIn), s2 = 1 / Math.sqrt(nHid);
+  for (let i = 0; i < net.W1.length; i++) net.W1[i] = randn(rng) * s1;
+  for (let i = 0; i < net.W2.length; i++) net.W2[i] = randn(rng) * s2;
+  return net;
+}
+
+function netForward(net, x) {
+  const { nIn, nHid, nOut, W1, b1, W2, b2, h, y } = net;
+  net.x.set(x);
+  for (let j = 0; j < nHid; j++) h[j] = b1[j];
+  for (let i = 0; i < nIn; i++) {
+    const xi = x[i];
+    if (xi === 0) continue;
+    const row = i * nHid;
+    for (let j = 0; j < nHid; j++) h[j] += xi * W1[row + j];
+  }
+  for (let j = 0; j < nHid; j++) h[j] = Math.tanh(h[j]);
+  for (let k = 0; k < nOut; k++) y[k] = b2[k];
+  for (let j = 0; j < nHid; j++) {
+    const hj = h[j], row = j * nOut;
+    for (let k = 0; k < nOut; k++) y[k] += hj * W2[row + k];
+  }
+  for (let k = 0; k < nOut; k++) y[k] = Math.tanh(y[k]);
+  return y;
+}
+
+function netClone(net) {
+  const c = createNet(net.nIn, net.nHid, net.nOut, () => 0.5);
+  for (const k of ["W1", "b1", "W2", "b2"]) c[k].set(net[k]);
+  return c;
+}
+
+// Mutation: auf jedes Gewicht und jede Schwelle Gauss-Rauschen mit Stärke sigma
+function netMutate(net, sigma, rng) {
+  for (const k of ["W1", "b1", "W2", "b2"]) {
+    const a = net[k];
+    for (let i = 0; i < a.length; i++) a[i] += sigma * randn(rng);
+  }
+  return net;
+}
+
+function netParamCount(net) {
+  return net.W1.length + net.b1.length + net.W2.length + net.b2.length;
+}
+
+function netToJSON(net) {
+  const r = (a) => Array.from(a, (v) => +v.toFixed(6));
+  return { nIn: net.nIn, nHid: net.nHid, nOut: net.nOut, W1: r(net.W1), b1: r(net.b1), W2: r(net.W2), b2: r(net.b2) };
+}
+
+function netFromJSON(o) {
+  const net = createNet(o.nIn, o.nHid, o.nOut, () => 0.5);
+  for (const k of ["W1", "b1", "W2", "b2"]) {
+    if (o[k].length !== net[k].length) throw new Error(`Netz-Datei passt nicht: ${k} hat ${o[k].length} statt ${net[k].length} Werte`);
+    net[k].set(o[k]);
+  }
+  return net;
+}
+</script>
+<script>
+// ---- src/brain.js ----
+// Gehirn der Ameise: Sensoren -> Netz-Eingänge, Netz-Ausgänge -> Gelenk-Sollwerte.
+//
+// Eingänge (28), alle etwa im Bereich −1..+1:
+//   Duft Stärke (0..1), Duft Richtung (−1 rechts .. +1 links)
+//   Takt sin/cos: innerer Taktgeber, gibt dem Netz einen Rhythmus für den Gang
+//   6 × Fusskontakt (1 = am Boden)
+//   18 × Gelenkwinkel, auf den Gelenkbereich normiert (−1 = Minimum, +1 = Maximum)
+// Ausgänge (18): Sollwert pro Gelenk, tanh −1..+1 -> Gelenkbereich (0 = Mitte)
+//
+// Wie bei echten Tieren ist die Steuerung träge: Das Netz rechnet nur rateHz-mal pro Sekunde,
+// und die Muskeln folgen dem Befehl mit der Zeitkonstante muscleTau. Ohne das kann ein Netz die
+// Gelenke mit 50–90 Hz zittern lassen, und die Füsse rutschen nur noch.
+
+const BRAIN_DEFAULTS = { hidden: 16, clockHz: 3, rateHz: 60, muscleTau: 0.05 };
+
+const INPUT_GROUPS = [
+  { name: "Duft", from: 0, n: 2 },
+  { name: "Takt", from: 2, n: 2 },
+  { name: "Kontakt", from: 4, n: 6 },
+  { name: "Winkel", from: 10, n: 18 },
+];
+const JOINT_SHORT = ["α", "β", "γ"];
+const JOINT_LABELS = LEG_NAMES.flatMap((l) => JOINT_SHORT.map((j) => `${l} ${j}`));
+const INPUT_NAMES = ["Duft Stärke", "Duft Richtung", "Takt sin", "Takt cos",
+  ...LEG_NAMES.map((l) => `Kontakt ${l}`), ...JOINT_LABELS];
+const OUTPUT_NAMES = JOINT_LABELS;
+const N_IN = INPUT_NAMES.length, N_OUT = OUTPUT_NAMES.length;
+
+function createBrain(seed, hidden = BRAIN_DEFAULTS.hidden) {
+  return createNet(N_IN, hidden, N_OUT, makeRng(seed));
+}
+
+function brainInputs(ant, sense, t, clockHz, x = new Float64Array(N_IN)) {
+  x[0] = sense.intensity;
+  x[1] = Math.max(-1, Math.min(1, sense.diff));
+  const ph = 2 * Math.PI * clockHz * t;
+  x[2] = Math.sin(ph); x[3] = Math.cos(ph);
+  for (let l = 0; l < 6; l++) x[4 + l] = ant.contact[l];
+  for (let i = 0; i < 18; i++) {
+    const [lo, hi] = JOINT_LIMITS[i % 3];
+    x[10 + i] = (2 * ant.joints[i] / DEG - lo - hi) / (hi - lo);
+  }
+  return x;
+}
+
+// Muskel: Sollwert läuft dem Netz-Befehl mit Zeitkonstante tau nach (dt = Zeit seit letztem Befehl)
+function applyBrainOutputs(ant, y, dt = Infinity, tau = BRAIN_DEFAULTS.muscleTau) {
+  const f = Math.min(1, dt / tau);
+  for (let i = 0; i < 18; i++) {
+    const [lo, hi] = JOINT_LIMITS[i % 3];
+    const want = (lo + (y[i] + 1) / 2 * (hi - lo)) * DEG;
+    ant.targets[i] += (want - ant.targets[i]) * f;
+  }
+}
+
+// Steuerung über die Zeit: ruft das Netz nur alle 1/rateHz Sekunden auf, dazwischen bleibt der Befehl.
+function createController(net, params = BRAIN_DEFAULTS) {
+  return { net, params, nextT: 0 };
+}
+
+// apply = false: Netz rechnet nur mit (für die Anzeige), steuert aber nicht
+function controllerStep(ctrl, ant, sense, t, apply = true) {
+  const p = ctrl.params, period = 1 / p.rateHz;
+  if (t + 1e-9 >= ctrl.nextT) {
+    brainInputs(ant, sense, t, p.clockHz, ctrl.net.x);
+    netForward(ctrl.net, ctrl.net.x);
+    ctrl.nextT += period;
+  }
+  // Muskel bei jedem Physikschritt nachführen
+  if (apply) applyBrainOutputs(ant, ctrl.net.y, PHYSICS_DT, p.muscleTau);
+}
+</script>
+<script>
+// ---- src/render.js ----
+// Zeichnen: Welt von oben (Hang, Höhenlinien, Ziel), Ameise, Kräfte und Gangbild.
+// Die Kamera folgt der Ameise; Welt-y (hangaufwärts) zeigt auf dem Bildschirm nach oben.
+
+function cssVar(name) {
+  return getComputedStyle(document.documentElement).getPropertyValue(name).trim();
+}
+
+function fitCanvas(cv) {
+  const dpr = window.devicePixelRatio || 1;
+  const w = cv.clientWidth, h = cv.clientHeight;
+  if (cv.width !== Math.round(w * dpr) || cv.height !== Math.round(h * dpr)) {
+    cv.width = Math.round(w * dpr); cv.height = Math.round(h * dpr);
+  }
+  const ctx = cv.getContext("2d");
+  ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+  return { ctx, w, h };
+}
+
+function drawWorld(cv, world, ant, view) {
+  const { ctx, w, h } = fitCanvas(cv);
+  const sc = view.scale;                         // px pro cm
+  const sx = (x) => w / 2 + (x - view.cx) * sc;
+  const sy = (y) => h / 2 - (y - view.cy) * sc;
+  const toWx = (px) => view.cx + (px - w / 2) / sc;
+  const toWy = (py) => view.cy - (py - h / 2) / sc;
+
+  // Hang: Farbe nach Höhe, unten (Start) hell, oben (Ziel) kräftiger
+  const yTop = toWy(0), yBot = toWy(h);
+  const grad = ctx.createLinearGradient(0, sy(0), 0, sy(world.goalY));
+  grad.addColorStop(0, cssVar("--ground-lo"));
+  grad.addColorStop(1, cssVar("--ground-hi"));
+  ctx.fillStyle = grad;
+  ctx.fillRect(0, 0, w, h);
+
+  drawScent(ctx, world.scent, sx, sy, sc);
+
+  // Höhenlinien alle 1 cm (hangaufwärts), dicker alle 5 cm
+  ctx.font = "11px " + cssVar("--font-num");
+  ctx.textBaseline = "bottom";
+  const sin = Math.sin(world.slopeDeg * DEG);
+  for (let y = Math.floor(yBot); y <= yTop; y++) {
+    const major = y % 5 === 0;
+    ctx.strokeStyle = cssVar(major ? "--grid-major" : "--grid");
+    ctx.lineWidth = major ? 1.2 : 1;
+    ctx.beginPath(); ctx.moveTo(0, sy(y)); ctx.lineTo(w, sy(y)); ctx.stroke();
+    if (major) {
+      ctx.fillStyle = cssVar("--muted");
+      ctx.fillText(`${y} cm · Höhe ${(y * sin).toFixed(1)} cm`, 6, sy(y) - 2);
+    }
+  }
+  // senkrechte Hilfslinien, damit man seitliches Driften sieht
+  ctx.strokeStyle = cssVar("--grid");
+  for (let x = Math.floor(toWx(0)); x <= toWx(w); x++) {
+    ctx.beginPath(); ctx.moveTo(sx(x), 0); ctx.lineTo(sx(x), h); ctx.stroke();
+  }
+
+  // Start- und Ziellinie
+  for (const [y, label, col] of [[0, "Start", "--muted"], [world.goalY, "Ziel", "--goal"]]) {
+    const py = sy(y);
+    if (py < -20 || py > h + 20) continue;
+    ctx.strokeStyle = cssVar(col); ctx.lineWidth = 2.5; ctx.setLineDash([8, 6]);
+    ctx.beginPath(); ctx.moveTo(0, py); ctx.lineTo(w, py); ctx.stroke(); ctx.setLineDash([]);
+    ctx.fillStyle = cssVar(col); ctx.font = "600 12px " + cssVar("--font-ui");
+    ctx.fillText(label, w - 44, py - 4);
+  }
+
+  // Spur
+  if (view.trail.length > 1) {
+    ctx.strokeStyle = cssVar("--trail"); ctx.lineWidth = 2;
+    ctx.beginPath();
+    view.trail.forEach((p, i) => (i ? ctx.lineTo(sx(p.x), sy(p.y)) : ctx.moveTo(sx(p.x), sy(p.y))));
+    ctx.stroke();
+  }
+
+  // übrige Ameisen der Kolonie blass, die gewählte kräftig obendrauf
+  if (view.swarm && view.swarm.length) {
+    ctx.globalAlpha = 0.32;
+    const plain = { ...view, showForces: false, sense: false };
+    for (const m of view.swarm) drawAnt(ctx, m.ant, sx, sy, sc, plain);
+    ctx.globalAlpha = 1;
+    // Ring um die gewählte
+    ctx.strokeStyle = cssVar("--accent"); ctx.lineWidth = 2; ctx.setLineDash([4, 3]);
+    ctx.beginPath(); ctx.arc(sx(ant.x), sy(ant.y), 0.75 * sc, 0, 2 * Math.PI); ctx.stroke(); ctx.setLineDash([]);
+  }
+  drawAnt(ctx, ant, sx, sy, sc, view);
+}
+
+// Duftwolke um die Quelle; Ringe bei C = 0.8, 0.6, 0.4, 0.2, 0.1 (labels = false: ohne Beschriftung)
+function drawScent(ctx, scent, sx, sy, sc, labels = true) {
+  const cx = sx(scent.x), cy = sy(scent.y), col = cssVar("--scent-rgb");
+  const R = 3 * scent.lambda * sc;
+  const g = ctx.createRadialGradient(cx, cy, 0, cx, cy, R);
+  for (let i = 0; i <= 6; i++) g.addColorStop(i / 6, `rgba(${col}, ${(0.35 * Math.exp(-3 * i / 6)).toFixed(3)})`);
+  g.addColorStop(1, `rgba(${col}, 0)`);
+  ctx.fillStyle = g;
+  ctx.beginPath(); ctx.arc(cx, cy, R, 0, 2 * Math.PI); ctx.fill();
+  ctx.strokeStyle = `rgba(${col}, 0.45)`; ctx.lineWidth = 1; ctx.setLineDash([3, 4]);
+  ctx.font = "11px " + cssVar("--font-num"); ctx.fillStyle = `rgba(${col}, 0.9)`; ctx.textBaseline = "bottom";
+  for (const c of [0.8, 0.6, 0.4, 0.2, 0.1]) {
+    const r = -Math.log(c) * scent.lambda * sc;
+    ctx.beginPath(); ctx.arc(cx, cy, r, 0, 2 * Math.PI); ctx.stroke();
+    if (labels) ctx.fillText(c.toFixed(1), cx + r * 0.7071 + 3, cy + r * 0.7071 - 1);
+  }
+  ctx.setLineDash([]);
+  ctx.fillStyle = `rgb(${col})`;
+  ctx.beginPath(); ctx.arc(cx, cy, 6, 0, 2 * Math.PI); ctx.fill();
+  if (labels) { ctx.font = "600 12px " + cssVar("--font-ui"); ctx.fillText("Duftquelle", cx + 9, cy - 4); }
+}
+
+function drawAnt(ctx, ant, sx, sy, sc, view) {
+  const G = ANT_GEOM;
+  const P = (px, py) => { const p = toWorld(ant, px, py); return [sx(p.x), sy(p.y)]; };
+  ctx.lineCap = "round"; ctx.lineJoin = "round";
+
+  // Beine: von oben gesehen; ein angehobenes Bein wirkt durch die Projektion kürzer
+  const legCol = cssVar("--ant-leg");
+  G.legs.forEach((leg, l) => {
+    const f = ant.feet[l];
+    const [hx, hy] = P(leg.hipX, leg.hipY), [kx, ky] = P(f.kx, f.ky), [fx, fy] = P(f.x, f.y);
+    ctx.strokeStyle = legCol;
+    ctx.lineWidth = Math.max(1.5, 0.06 * sc);
+    ctx.beginPath(); ctx.moveTo(hx, hy); ctx.lineTo(kx, ky); ctx.stroke();
+    ctx.lineWidth = Math.max(1, 0.04 * sc);
+    ctx.beginPath(); ctx.moveTo(kx, ky); ctx.lineTo(fx, fy); ctx.stroke();
+    // Fuss: gefüllt = Bodenkontakt, rot = rutscht, Ring = in der Luft
+    const r = Math.max(2.5, 0.05 * sc);
+    ctx.beginPath(); ctx.arc(fx, fy, r, 0, 2 * Math.PI);
+    if (ant.contact[l]) { ctx.fillStyle = cssVar(ant.slipping[l] ? "--slip" : "--stance"); ctx.fill(); }
+    else { ctx.strokeStyle = cssVar("--swing"); ctx.lineWidth = 1.5; ctx.stroke(); }
+  });
+
+  // Fühler (zweiteilig)
+  ctx.strokeStyle = legCol; ctx.lineWidth = Math.max(1, 0.03 * sc);
+  for (const a of antennaPoints(ant)) {
+    ctx.beginPath();
+    ctx.moveTo(sx(a.base.x), sy(a.base.y)); ctx.lineTo(sx(a.elbow.x), sy(a.elbow.y)); ctx.lineTo(sx(a.tip.x), sy(a.tip.y));
+    ctx.stroke();
+  }
+  // Fühlerspitzen = Duftsensoren
+  if (view.sense) {
+    const col = cssVar("--scent-rgb");
+    antennaPoints(ant).forEach((a) => {
+      ctx.beginPath(); ctx.arc(sx(a.tip.x), sy(a.tip.y), Math.max(2.5, 0.045 * sc), 0, 2 * Math.PI);
+      ctx.fillStyle = `rgb(${col})`; ctx.fill();
+    });
+  }
+
+  // Körper: Abdomen, Thorax, Kopf als Ellipsen
+  const rot = -ant.heading;     // Bildschirm-y zeigt nach unten
+  for (const g of [G.segments[2], G.segments[1], G.segments[0]]) {
+    const [cx, cy] = P(g.x, 0);
+    ctx.beginPath(); ctx.ellipse(cx, cy, g.rx * sc, g.ry * sc, rot, 0, 2 * Math.PI);
+    ctx.fillStyle = cssVar("--ant-body"); ctx.fill();
+    ctx.strokeStyle = cssVar("--ant-edge"); ctx.lineWidth = 1; ctx.stroke();
+  }
+
+  // Reibungskräfte an den Füssen (wirken auf den Körper)
+  if (view.showForces) {
+    const fs = view.forceScale * sc;
+    ctx.strokeStyle = cssVar("--force"); ctx.fillStyle = cssVar("--force"); ctx.lineWidth = 2;
+    G.legs.forEach((leg, l) => {
+      if (!ant.contact[l]) return;
+      const f = ant.feet[l], F = ant.footForce[l];
+      const [fx, fy] = P(f.x, f.y);
+      const ex = fx + F.x * fs, ey = fy - F.y * fs;
+      if (Math.hypot(ex - fx, ey - fy) < 2) return;
+      arrow(ctx, fx, fy, ex, ey);
+    });
+  }
+}
+
+function arrow(ctx, x0, y0, x1, y1) {
+  const a = Math.atan2(y1 - y0, x1 - x0), s = 6;
+  ctx.beginPath(); ctx.moveTo(x0, y0); ctx.lineTo(x1, y1); ctx.stroke();
+  ctx.beginPath(); ctx.moveTo(x1, y1);
+  ctx.lineTo(x1 - s * Math.cos(a - 0.4), y1 - s * Math.sin(a - 0.4));
+  ctx.lineTo(x1 - s * Math.cos(a + 0.4), y1 - s * Math.sin(a + 0.4));
+  ctx.closePath(); ctx.fill();
+}
+
+// Gangbild: pro Bein eine Zeile, dunkel = Fuss am Boden, rot = rutscht. Neueste Werte rechts.
+function drawGait(cv, history) {
+  const { ctx, w, h } = fitCanvas(cv);
+  ctx.fillStyle = cssVar("--surface"); ctx.fillRect(0, 0, w, h);
+  const labelW = 26, rowH = h / 6, n = history.length;
+  const colW = (w - labelW) / GAIT_HISTORY;
+  ctx.font = "11px " + cssVar("--font-num"); ctx.textBaseline = "middle";
+  const stance = cssVar("--stance"), slip = cssVar("--slip");
+  for (let l = 0; l < 6; l++) {
+    ctx.fillStyle = cssVar("--muted");
+    ctx.fillText(LEG_NAMES[l], 2, (l + 0.5) * rowH);
+    for (let i = 0; i < n; i++) {
+      const v = history[i][l];
+      if (!v) continue;
+      ctx.fillStyle = v === 2 ? slip : stance;
+      ctx.fillRect(labelW + (GAIT_HISTORY - n + i) * colW, l * rowH + 2, Math.ceil(colW), rowH - 4);
+    }
+  }
+}
+const GAIT_HISTORY = 240;
+</script>
+<script>
+// ---- src/viewer.js ----
+// Viewer fürs iPhone: trainierte Ameisen im Vollbild, die Neigung kommt vom Lagesensor.
+// Bildschirm = Boden. Oberkante anheben -> bergauf nach oben, seitlich kippen -> seitlich geneigt.
+// «Nullpunkt»: aktuelle Haltung gilt als flach. Antippen versetzt die Duftquelle.
+// Wer an der Duftquelle ankommt oder aus dem Bild rutscht, startet unten neu.
+
+// Beim Bündeln (build_web.py) wird hier eine trainierte Kolonie eingesetzt
+const EMBEDDED_ANTS = null;
+
+const MAIN_STORE = "neuronale-ameisen-lernstand";    // Lernstand der Hauptseite (gleiche Adresse)
+const VIEWER_STORE = "neuronale-ameisen-viewer";     // im Viewer geladene Datei
+const MAX_SLOPE = 45, FIELD_CM = 14;                 // Bildbreite in cm
+const DT = PHYSICS_DT;
+
+const world = { ...WORLD_DEFAULTS, slopeDeg: 0, slopeXDeg: 0, scent: { ...SCENT_DEFAULTS } };
+const cv = document.getElementById("cv");
+const $ = (id) => document.getElementById(id);
+let ants = [], arrived = 0, sourceName = "";
+let field = { w: 0, h: 0, scale: 30, x0: 0, x1: 0, y0: 0, y1: 0 };
+const rng = makeRng(Date.now() >>> 0);
+
+// ---------- Netze laden ----------
+function netsFrom(o) {
+  if (o.members) return o.members.map((m) => netFromJSON(m.net));     // Kolonie
+  if (o.net) return [netFromJSON(o.net)];                             // eine Ameise
+  throw new Error("Keine Ameisen in der Datei");
+}
+function describe(o) {
+  const kind = o.members ? `Kolonie, ${o.members.length} Ameisen` : "eine Ameise";
+  const slope = o.curriculum ? o.curriculum.slope : o.episode && o.episode.world ? o.episode.world.slopeDeg : 0;
+  return `${kind}, Generation ${o.generation}, gelernt bis ${slope}°`;
+}
+function readStore(key) {
+  try { const s = localStorage.getItem(key); return s ? JSON.parse(s) : null; } catch (e) { return null; }
+}
+function sources() {
+  const list = [];
+  if (EMBEDDED_ANTS) list.push({ key: "embedded", label: "Eingebaute Kolonie", data: EMBEDDED_ANTS });
+  const main = readStore(MAIN_STORE);
+  if (main) list.push({ key: "main", label: "Aus der Hauptseite", data: main });
+  const file = readStore(VIEWER_STORE);
+  if (file) list.push({ key: "file", label: "Geladene Datei", data: file });
+  return list;
+}
+function fillSourceMenu(selectKey) {
+  const list = sources(), sel = $("source");
+  sel.innerHTML = list.map((s) => `<option value="${s.key}">${s.label}</option>`).join("") || `<option value="">Zufallsnetze</option>`;
+  if (selectKey && list.some((s) => s.key === selectKey)) sel.value = selectKey;
+  return list;
+}
+function useSource(key) {
+  const list = sources(), s = list.find((x) => x.key === key) || list[0];
+  let nets;
+  if (s) {
+    try { nets = netsFrom(s.data); sourceName = `${s.label}: ${describe(s.data)}`; } catch (e) { nets = null; }
+  }
+  if (!nets) { nets = Array.from({ length: 12 }, (_, i) => createBrain(i + 1)); sourceName = "Zufallsnetze (noch nichts gelernt)"; }
+  // eine einzelne Ameise: mehrere Kopien laufen lassen
+  while (nets.length < 8) nets = nets.concat(nets.map(netClone)).slice(0, 8);
+  ants = nets.slice(0, 32).map((net) => spawn({ ctrl: createController(net) }, true));
+  arrived = 0;
+  try { localStorage.setItem("neuronale-ameisen-viewer-quelle", s ? s.key : ""); } catch (e) { /* egal */ }
+}
+
+// ---------- Feld und Ameisen ----------
+function layout() {
+  const w = cv.clientWidth, h = cv.clientHeight;
+  const scale = w / FIELD_CM;
+  field = { w, h, scale, x0: -w / 2 / scale, x1: w / 2 / scale, y0: -1.5, y1: h / scale - 1.5 };
+  if (!world.scent.placed) { world.scent.x = 0; world.scent.y = field.y1 - 2; }
+}
+function spawn(m, scatter = false) {
+  const margin = 1;
+  const x = field.x0 + margin + rng() * (field.x1 - field.x0 - 2 * margin);
+  const y = scatter ? field.y0 + 1 + rng() * (field.y1 - field.y0) * 0.35 : field.y0 + 0.5;
+  m.ant = createAnt(x, y, (90 + (rng() - 0.5) * 80) * DEG);
+  m.t = rng();                      // Takt nicht bei allen gleich
+  m.ctrl.nextT = m.t;
+  return m;
+}
+function step() {
+  for (const m of ants) {
+    controllerStep(m.ctrl, m.ant, senseScent(m.ant, world.scent, rng), m.t);
+    physicsStep(m.ant, world, DT);
+    m.t += DT;
+    const a = m.ant;
+    if (Math.hypot(a.x - world.scent.x, a.y - world.scent.y) < 0.7) { arrived++; spawn(m); continue; }
+    if (a.y < field.y0 - 1.5 || a.y > field.y1 + 1.5 || a.x < field.x0 - 1.5 || a.x > field.x1 + 1.5) spawn(m);
+  }
+}
+
+// ---------- Lagesensor ----------
+// beta: vorne/hinten kippen (Oberkante hoch = +), gamma: seitlich (rechte Kante runter = +).
+// Hangaufwärts in Gerätekoordinaten: (−gamma, beta); bei gedrehtem Bildschirm entsprechend drehen.
+const tilt = { beta: null, gamma: null }, zero = { beta: 0, gamma: 0 };
+let sensorOn = false;
+function onOrientation(e) {
+  if (e.beta == null) return;
+  tilt.beta = e.beta; tilt.gamma = e.gamma;
+  if (!sensorOn) { sensorOn = true; showSensorState(); }
+}
+function screenAngle() {
+  return (screen.orientation && screen.orientation.angle) || window.orientation || 0;
+}
+function targetSlope() {
+  if (!sensorOn) return { y: +$("slope").value, x: 0 };
+  let gx = -(tilt.gamma - zero.gamma), gy = tilt.beta - zero.beta;
+  const a = ((screenAngle() % 360) + 360) % 360;
+  if (a === 90) [gx, gy] = [-gy, gx];
+  else if (a === 270) [gx, gy] = [gy, -gx];
+  else if (a === 180) [gx, gy] = [-gx, -gy];
+  const clamp = (v) => Math.max(-MAX_SLOPE, Math.min(MAX_SLOPE, v));
+  return { x: clamp(gx), y: clamp(gy) };
+}
+function enableSensor() {
+  const D = window.DeviceOrientationEvent;
+  if (!D) { message("Dieses Gerät hat keinen Lagesensor – die Neigung lässt sich mit dem Regler einstellen."); return; }
+  if (typeof D.requestPermission === "function") {        // iPhone: Erlaubnis nach Antippen
+    D.requestPermission().then((state) => {
+      if (state === "granted") window.addEventListener("deviceorientation", onOrientation);
+      else message("Ohne Erlaubnis für Bewegung & Ausrichtung geht es nur mit dem Regler. In den Safari-Einstellungen lässt sich das ändern.");
+    }).catch(() => message("Der Lagesensor braucht eine sichere Verbindung (https). Über GitHub Pages öffnen."));
+  } else {
+    window.addEventListener("deviceorientation", onOrientation);
+    setTimeout(() => { if (!sensorOn) message("Kein Lagesensor gefunden – die Neigung lässt sich mit dem Regler einstellen."); showSensorState(); }, 1500);
+  }
+}
+function showSensorState() {
+  $("sensor").hidden = sensorOn;
+  $("zero").hidden = !sensorOn;
+  $("slider").style.display = sensorOn ? "none" : "flex";
+}
+
+// ---------- Bedienung ----------
+let hideTimer = null;
+function showBar() {
+  $("bar").classList.remove("hide");
+  clearTimeout(hideTimer);
+  hideTimer = setTimeout(() => { if ($("msg").hidden) $("bar").classList.add("hide"); }, 5000);
+}
+function message(html) {
+  const m = $("msg");
+  m.innerHTML = html + `<br><br><button id="msg-ok">OK</button>`;
+  m.hidden = false;
+  $("msg-ok").onclick = () => { m.hidden = true; showBar(); };
+}
+$("sensor").onclick = enableSensor;
+$("zero").onclick = () => { zero.beta = tilt.beta || 0; zero.gamma = tilt.gamma || 0; showBar(); };
+$("slope").oninput = () => { $("slope-v").textContent = $("slope").value + "°"; };
+$("source").onchange = () => { useSource($("source").value); showBar(); };
+$("file").onclick = () => $("file-in").click();
+$("file-in").onchange = (e) => {
+  const f = e.target.files[0];
+  if (!f) return;
+  f.text().then((t) => {
+    const o = JSON.parse(t);
+    netsFrom(o);                                          // prüfen
+    try { localStorage.setItem(VIEWER_STORE, t); } catch (err) { /* zu gross: nur jetzt verwenden */ }
+    fillSourceMenu("file");
+    useSource("file");
+    if (!sources().some((s) => s.key === "file")) { ants = netsFrom(o).map((net) => spawn({ ctrl: createController(net) }, true)); }
+    message(`Geladen: <b>${f.name}</b><br>${describe(o)}`);
+  }).catch((err) => message("Laden fehlgeschlagen: " + err.message));
+  e.target.value = "";
+};
+$("help").onclick = () => message(
+  `<b>Ameisen-Viewer</b><br>Jede Ameise hat ihr eigenes, trainiertes Netz.<br><br>` +
+  `• <b>iPhone neigen</b> = Hang neigen: Oberkante hoch → bergauf zur Duftquelle. Seitlich kippen → seitlicher Hang.<br>` +
+  `• <b>Nullpunkt</b>: so wie du das iPhone gerade hältst, gilt als flach.<br>` +
+  `• <b>Antippen</b>: Duftquelle dorthin setzen.<br>` +
+  `• Gelernt wurde bis etwa 20° – steiler rutschen sie ab.<br><br>${sourceName}`);
+cv.addEventListener("pointerdown", (e) => {
+  showBar();
+  const b = cv.getBoundingClientRect();
+  world.scent.x = field.x0 + (e.clientX - b.left) / field.scale;
+  world.scent.y = field.y1 - (e.clientY - b.top) / field.scale;
+  world.scent.placed = true;
+});
+window.addEventListener("resize", layout);
+
+// ---------- Zeichnen ----------
+function draw() {
+  const { ctx, w, h } = fitCanvas(cv);
+  const sc = field.scale;
+  const sx = (x) => (x - field.x0) * sc, sy = (y) => (field.y1 - y) * sc;
+  // Boden: heller unten, dunkler oben je nach Neigung
+  const g = ctx.createLinearGradient(0, h, 0, 0);
+  const k = Math.max(0, Math.min(1, 0.5 + world.slopeDeg / 60));
+  g.addColorStop(0, cssVar("--ground-lo"));
+  g.addColorStop(1, mix(cssVar("--ground-lo"), cssVar("--ground-hi"), k));
+  ctx.fillStyle = g; ctx.fillRect(0, 0, w, h);
+  ctx.strokeStyle = cssVar("--grid"); ctx.lineWidth = 1;
+  for (let x = Math.ceil(field.x0); x <= field.x1; x += 2) { ctx.beginPath(); ctx.moveTo(sx(x), 0); ctx.lineTo(sx(x), h); ctx.stroke(); }
+  for (let y = Math.ceil(field.y0); y <= field.y1; y += 2) { ctx.beginPath(); ctx.moveTo(0, sy(y)); ctx.lineTo(w, sy(y)); ctx.stroke(); }
+  drawScent(ctx, world.scent, sx, sy, sc, false);
+  const v = { showForces: false, sense: false };
+  for (const m of ants) drawAnt(ctx, m.ant, sx, sy, sc, v);
+  drawSlopeArrow(ctx, w, h);
+}
+// Pfeil "bergab" unten rechts: Richtung und Länge zeigen, wohin die Schwerkraft zieht
+function drawSlopeArrow(ctx, w, h) {
+  const s = Math.hypot(world.slopeDeg, world.slopeXDeg);
+  if (s < 1) return;
+  const cx = w - 46, cy = h - 120, len = 10 + 26 * Math.min(1, s / 30);
+  const ax = -world.slopeXDeg / s, ay = world.slopeDeg / s;     // bergab, Bildschirm-y nach unten
+  ctx.strokeStyle = cssVar("--muted"); ctx.fillStyle = cssVar("--muted"); ctx.lineWidth = 3;
+  arrow(ctx, cx - ax * len / 2, cy - ay * len / 2, cx + ax * len / 2, cy + ay * len / 2);
+  ctx.font = "11px " + cssVar("--font-num"); ctx.textAlign = "center";
+  ctx.fillText("bergab", cx, cy + 34);
+}
+function mix(a, b, t) {
+  const p = (c) => hexRgb(c);
+  const A = p(a), B = p(b);
+  return `rgb(${A.map((v, i) => Math.round(v + (B[i] - v) * t)).join(",")})`;
+}
+function hexRgb(s) {
+  if (s.startsWith("#")) return [1, 3, 5].map((i) => parseInt(s.slice(i, i + 2), 16));
+  return s.match(/\d+/g).slice(0, 3).map(Number);
+}
+
+// ---------- Schleife ----------
+let last = performance.now(), acc = 0;
+function frame(now) {
+  const real = Math.min(0.05, (now - last) / 1000);
+  last = now;
+  // Neigung weich nachführen (Sensor zittert)
+  const t = targetSlope();
+  world.slopeDeg += (t.y - world.slopeDeg) * 0.2;
+  world.slopeXDeg += (t.x - world.slopeXDeg) * 0.2;
+  acc += real;
+  while (acc >= DT) { step(); acc -= DT; }
+  draw();
+  $("tilt").textContent = `↑ ${Math.round(world.slopeDeg)}° · ↔ ${Math.round(world.slopeXDeg)}°`;
+  $("count").textContent = `oben: ${arrived}`;
+  requestAnimationFrame(frame);
+}
+
+layout();
+let startKey = null;
+try { startKey = localStorage.getItem("neuronale-ameisen-viewer-quelle"); } catch (e) { /* egal */ }
+fillSourceMenu(startKey);
+useSource($("source").value);
+showSensorState();
+showBar();
+if (!sources().length) message("Noch keine trainierten Ameisen gefunden – es laufen Zufallsnetze.<br>Trainieren in der Hauptseite, oder «Datei…» mit einem gespeicherten Lernstand (.json).");
+requestAnimationFrame(frame);
+</script>
+<script>
+// Offline: Service Worker nur über https oder localhost (bei file:// geht es auch ohne)
+if ("serviceWorker" in navigator && (location.protocol === "https:" || location.hostname === "localhost")) {
+  navigator.serviceWorker.register("sw.js");
+}
+</script>
+</body>
+</html>

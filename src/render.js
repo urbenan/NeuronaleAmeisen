@@ -72,11 +72,21 @@ function drawWorld(cv, world, ant, view) {
     ctx.stroke();
   }
 
+  // übrige Ameisen der Kolonie blass, die gewählte kräftig obendrauf
+  if (view.swarm && view.swarm.length) {
+    ctx.globalAlpha = 0.32;
+    const plain = { ...view, showForces: false, sense: false };
+    for (const m of view.swarm) drawAnt(ctx, m.ant, sx, sy, sc, plain);
+    ctx.globalAlpha = 1;
+    // Ring um die gewählte
+    ctx.strokeStyle = cssVar("--accent"); ctx.lineWidth = 2; ctx.setLineDash([4, 3]);
+    ctx.beginPath(); ctx.arc(sx(ant.x), sy(ant.y), 0.75 * sc, 0, 2 * Math.PI); ctx.stroke(); ctx.setLineDash([]);
+  }
   drawAnt(ctx, ant, sx, sy, sc, view);
 }
 
-// Duftwolke um die Quelle; Ringe bei C = 0.8, 0.6, 0.4, 0.2, 0.1
-function drawScent(ctx, scent, sx, sy, sc) {
+// Duftwolke um die Quelle; Ringe bei C = 0.8, 0.6, 0.4, 0.2, 0.1 (labels = false: ohne Beschriftung)
+function drawScent(ctx, scent, sx, sy, sc, labels = true) {
   const cx = sx(scent.x), cy = sy(scent.y), col = cssVar("--scent-rgb");
   const R = 3 * scent.lambda * sc;
   const g = ctx.createRadialGradient(cx, cy, 0, cx, cy, R);
@@ -89,12 +99,12 @@ function drawScent(ctx, scent, sx, sy, sc) {
   for (const c of [0.8, 0.6, 0.4, 0.2, 0.1]) {
     const r = -Math.log(c) * scent.lambda * sc;
     ctx.beginPath(); ctx.arc(cx, cy, r, 0, 2 * Math.PI); ctx.stroke();
-    ctx.fillText(c.toFixed(1), cx + r * 0.7071 + 3, cy + r * 0.7071 - 1);
+    if (labels) ctx.fillText(c.toFixed(1), cx + r * 0.7071 + 3, cy + r * 0.7071 - 1);
   }
   ctx.setLineDash([]);
   ctx.fillStyle = `rgb(${col})`;
   ctx.beginPath(); ctx.arc(cx, cy, 6, 0, 2 * Math.PI); ctx.fill();
-  ctx.font = "600 12px " + cssVar("--font-ui"); ctx.fillText("Duftquelle", cx + 9, cy - 4);
+  if (labels) { ctx.font = "600 12px " + cssVar("--font-ui"); ctx.fillText("Duftquelle", cx + 9, cy - 4); }
 }
 
 function drawAnt(ctx, ant, sx, sy, sc, view) {
